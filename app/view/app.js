@@ -69,11 +69,35 @@ Object.defineProperty(remote, 'currentTime', { get: () => remote.position, set: 
 Object.defineProperty(remote, 'volume', { get: () => volume / 100, set: (v) => { if (remote.active) shell.player('volume', { level: Math.round(v * 100) }).catch(() => {}); } });
 remote.play = () => (remote.active ? shell.player('play') : Promise.resolve());
 remote.pause = () => { if (remote.active) shell.player('pause').catch(() => {}); };
-const dockPlace = () => { const box = $('dock').getBoundingClientRect(); return { left: Math.round(box.left), top: Math.round(box.top), wide: Math.round(box.width), tall: Math.round(box.height) }; };
+// The player is shown as the bar's own cover: a square of the least size a player may have. While it shows, the bar
+// grows to hold it whole, and the title and transport sit beside it. The bar is glass: the page shows through it. Smaller, or hidden, is not allowed (PL-03, and the services' own terms).
+const TILE = 200;
+// In the immersive view the player takes the cover's own place, so the cover is the player: large, centred, with
+// the cover's colours spread behind it.
+const dockPlace = () => {
+  const art = $('now').hidden || $('now-still').hidden ? null : $('now-art').getBoundingClientRect();
+  if (art && art.width >= TILE && art.height >= TILE) return { left: Math.round(art.left), top: Math.round(art.top), wide: Math.round(art.width), tall: Math.round(art.height) };
+  const slot = $('bar-slot').getBoundingClientRect();
+  return { left: Math.round(slot.left), top: Math.round(slot.top), wide: TILE, tall: TILE };
+};
+let placed = '';
+/** Move the held player to where it belongs now. The model says whether it may be shown there (PL-03). */
+function placeRemote() {
+  if (!remote.active) return;
+  requestAnimationFrame(async () => {
+    if (!remote.active) return;
+    const place = dockPlace();
+    const key = `${place.left},${place.top},${place.wide},${place.tall}`;
+    if (key === placed) return;
+    if (await ask('place', place.wide, place.tall, place.left, place.top, globalThis.innerWidth, globalThis.innerHeight) !== 'show') return;
+    placed = key;
+    shell.player('place', { place }).catch(() => { placed = ''; });
+  });
+}
 function closeRemote() {
   if (!remote.active) return;
   remote.active = false; remote.paused = true; remote.position = 0; remote.duration = 0; remote.error = null;
-  $('dock').hidden = true;
+  $('bar-slot').hidden = true; $('now-cover').hidden = false; $('foot-tall').hidden = true; $('bar-big').hidden = true; $('now-title').parentElement.hidden = false;
   shell.player('close').catch(() => {});
 }
 shell.hear((told) => {
@@ -87,7 +111,7 @@ shell.hear((told) => {
   else if (told.state === 'error') { remote.error = true; remote.dispatchEvent(new Event('error')); }
   remote.dispatchEvent(new Event('timeupdate'));
 });
-addEventListener('resize', () => { if (remote.active) shell.player('place', { place: dockPlace() }).catch(() => {}); });
+addEventListener('resize', () => placeRemote());
 
 let queue = [];
 let at = -1;                 // the playing index, as the model last answered it
@@ -227,15 +251,18 @@ async function attempt(mine) {
   draw();
   if (rep.held) {
     // The holospace's player. The model says whether the dock is a place a player may be shown (PL-03).
-    $('dock').hidden = false;
+    $('bar-slot').hidden = false; $('now-cover').hidden = true; $('foot-tall').hidden = false;
+    $('bar-big').hidden = false; $('now-title').parentElement.hidden = true;
+    $('bar-big-title').textContent = item.title; $('bar-big-artist').textContent = [item.artist, item.album].filter(Boolean).join(' · ');
     const place = dockPlace();
     const fits = await ask('place', place.wide, place.tall, place.left, place.top, globalThis.innerWidth, globalThis.innerHeight);
     if (mine !== turn) return;
-    if (fits !== 'show') { $('dock').hidden = true; fail('The player does not fit', 'This window is too small to show the player. Make it larger and play the song again.'); return; }
+    if (fits !== 'show') { $('bar-slot').hidden = true; $('now-cover').hidden = false; $('foot-tall').hidden = true; $('bar-big').hidden = true; $('now-title').parentElement.hidden = false; fail('The player does not fit', 'This window is too small to show the player. Make it larger and play the song again.'); return; }
     routed = 'direct';
     audio = remote;
     remote.active = true; remote.paused = true; remote.position = 0; remote.duration = item.duration || 0; remote.error = null;
-    try { await shell.player('load', { provider: rep.held, ref: rep.ref, place }); }
+    placed = `${place.left},${place.top},${place.wide},${place.tall}`;
+    try { await shell.player('load', { provider: rep.held, ref: rep.ref, place, plain: true }); }
     catch { if (mine === turn) { closeRemote(); await failed(mine); } return; }
     draw();
     session();
@@ -620,53 +647,67 @@ async function openLink(text, mine) {
 let searching = 0;
 let searchTimer = 0;
 const RESULT_BOXES = ['r-artists', 'r-albums', 'r-open', 'r-radio', 'r-pods', 'r-books', 'r-sc'];
+let resultsFor = '';
 function search() {
   const term = $('search').value.trim();
   const mine = ++searching;
   opened = null;
-  if (!term) { show(section); return; }
-  const { audius, radio, podcasts, companion } = globalThis.HoloSources;
+  if (!term) { resultsFor = ''; show(section); return; }
+  const { audius, radio, podcasts, companion, catalogue, world } = globalThis.HoloSources;
+  // While a search is already on the page, its results stay until the new ones come: nothing blanks between keys.
+  const typing = resultsFor !== '' && !$('results').hidden;
+  resultsFor = term;
   show('results');
   $('results-title').textContent = term.length > 60 ? `${term.slice(0, 60)}…` : `“${term}”`;
-  for (const id of RESULT_BOXES) { $(id).replaceChildren(); $(`${id}-box`).hidden = true; }
   $('r-link').hidden = true;
-  if (/^https?:\/\/\S+$/i.test(term)) { $('r-songs-box').hidden = true; openLink(term, mine); return; }
+  if (/^https?:\/\/\S+$/i.test(term)) {
+    for (const id of RESULT_BOXES) { $(id).replaceChildren(); $(`${id}-box`).hidden = true; }
+    $('r-songs-box').hidden = true; openLink(term, mine); return;
+  }
+  if (!typing) {
+    for (const id of RESULT_BOXES) { $(id).replaceChildren(); $(`${id}-box`).hidden = true; }
+    $('r-songs').replaceChildren(note('Searching'));
+  }
   $('r-songs-box').hidden = false;
-  $('r-songs').replaceChildren(note('Searching'));
-  const list = (box) => (songs) => { if (mine !== searching || !songs.length) return; rows(box, songs, false); $(`${box}-box`).hidden = false; };
-  const tiles = (box) => (found) => { if (mine !== searching || !found.length) return; $(box).append(...found.map(entryTile)); $(`${box}-box`).hidden = false; };
+  const fresh = new Set(); // the groups this search has filled
+  const begin = (box) => { if (!fresh.has(box)) { fresh.add(box); $(box).replaceChildren(); } };
+  const list = (box) => (songs) => { if (mine !== searching || !songs.length) return; fresh.add(box); rows(box, songs, false); $(`${box}-box`).hidden = false; };
+  const tiles = (box) => (found) => { if (mine !== searching || !found.length) return; begin(box); $(box).append(...found.map(entryTile)); $(`${box}-box`).hidden = false; };
+  const songsIn = (songs) => {
+    if (mine !== searching) return;
+    if (songs.length) rows('r-songs', songs, false); else $('r-songs').replaceChildren(note('No songs were found.'));
+  };
+  const songsOut = (text) => () => { if (mine === searching) $('r-songs').replaceChildren(note(text)); };
   // The catalogue names every song, artist and album. Where the holospace reads iTunes for the page, that is the
   // catalogue: one quick answer with covers. Where it does not, MusicBrainz is, more slowly.
-  shell.players.then((offered) => {
-    if (mine !== searching) return;
-    if (offered.length) {
-      const { catalogue } = globalThis.HoloSources;
-      catalogue.songs(term, 24).then((songs) => {
-        if (mine !== searching) return;
-        if (songs.length) rows('r-songs', songs, false); else $('r-songs').replaceChildren(note('No songs were found.'));
-      }).catch(() => { if (mine === searching) $('r-songs').replaceChildren(note('The catalogue could not be reached. Check the connection.')); });
-      catalogue.artists(term, 6).then(tiles('r-artists')).catch(() => {});
-      catalogue.albums(term, 12).then(tiles('r-albums')).catch(() => {});
-      return;
-    }
-    globalThis.HoloSources.world.search(term).then((found) => {
-      if (mine !== searching) return;
+  const named = shell.players.then((offered) => {
+    if (mine !== searching) return null;
+    if (offered.length) return Promise.allSettled([
+      catalogue.songs(term, 24).then(songsIn, songsOut('The catalogue could not be reached. Check the connection.')),
+      catalogue.artists(term, 6).then(tiles('r-artists')),
+      catalogue.albums(term, 12).then(tiles('r-albums')),
+    ]);
+    return world.search(term).then((found) => {
+      if (mine !== searching) return null;
       tiles('r-artists')(found.artists);
-      found.songs.then((songs) => {
-        if (mine !== searching) return;
-        if (songs.length) rows('r-songs', songs, false); else $('r-songs').replaceChildren(note('No songs were found.'));
-      }).catch(() => { if (mine === searching) $('r-songs').replaceChildren(note('The catalogue is busy. Try again in a moment.')); });
-      found.albums.then(tiles('r-albums')).catch(() => {});
-    }).catch(() => { if (mine === searching) $('r-songs').replaceChildren(note('The catalogue could not be reached. Check the connection.')); });
+      return Promise.allSettled([found.songs.then(songsIn, songsOut('The catalogue is busy. Try again in a moment.')), found.albums.then(tiles('r-albums'))]);
+    }, songsOut('The catalogue could not be reached. Check the connection.'));
   });
-  audius.search(term, 12).then(list('r-open')).catch(() => {});
-  audius.artists(term, 6).then(tiles('r-artists')).catch(() => {});
-  audius.playlists(term, 6).then(tiles('r-albums')).catch(() => {});
-  radio.search(term, 8).then(list('r-radio')).catch(() => {});
-  podcasts.search(term, 6).then(tiles('r-pods')).catch(() => {});
-  globalThis.HoloLibrary.books(term, 6).then(tiles('r-books')).catch(() => {});
-  // SoundCloud is a companion source: the model says whether it is offered at all.
-  companion.probe().then(() => ask('offer', 1, companion.present() ? 1 : 0)).then((answer) => (answer === 'offer' ? companion.search(term, 12) : [])).then(list('r-sc')).catch(() => {});
+  const asked = [named,
+    audius.search(term, 12).then(list('r-open')),
+    audius.artists(term, 6).then(tiles('r-artists')),
+    audius.playlists(term, 6).then(tiles('r-albums')),
+    radio.search(term, 8).then(list('r-radio')),
+    podcasts.search(term, 6).then(tiles('r-pods')),
+    globalThis.HoloLibrary.books(term, 6).then(tiles('r-books')),
+    // SoundCloud is a companion source: the model says whether it is offered at all.
+    companion.probe().then(() => ask('offer', 1, companion.present() ? 1 : 0)).then((answer) => (answer === 'offer' ? companion.search(term, 12) : [])).then(list('r-sc')),
+  ];
+  // A group no source filled for this term held the last term's results: it goes once every source has answered.
+  Promise.allSettled(asked).then(() => {
+    if (mine !== searching) return;
+    for (const id of RESULT_BOXES) if (!fresh.has(id)) { $(id).replaceChildren(); $(`${id}-box`).hidden = true; }
+  });
 }
 
 /** A chart song no source has in full: say so, and show what can be played for it instead. */
@@ -952,7 +993,21 @@ $('volume').addEventListener('input', () => { volume = Number($('volume').value)
 
 $('error-close').addEventListener('click', clearFailure);
 $('album-back').addEventListener('click', () => { const to = opened ? opened.behind : 'home'; opened = null; show(to); });
-$('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(search, 140); });
+// The search box. The heading follows every key at once; the sources are asked a moment after the last key, sooner
+// once the term is long enough to mean something. Enter asks now. Escape clears and leaves. Focus selects.
+$('search').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  const term = $('search').value.trim();
+  if (!term) { search(); return; }
+  if (!$('results').hidden) $('results-title').textContent = term.length > 60 ? `${term.slice(0, 60)}…` : `“${term}”`;
+  searchTimer = setTimeout(search, term.length < 3 ? 180 : 70);
+});
+$('search').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') { event.preventDefault(); clearTimeout(searchTimer); search(); }
+  else if (event.key === 'Escape') { event.preventDefault(); clearTimeout(searchTimer); $('search').value = ''; search(); $('search').blur(); }
+});
+$('search').addEventListener('focus', () => $('search').select());
+addEventListener('keydown', (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); $('search').focus(); } });
 for (const tab of document.querySelectorAll('[data-tab]')) tab.addEventListener('click', () => { const view = tab.getAttribute('data-tab'); $('search').value = ''; searching += 1; opened = null; show(view); load(view); });
 $('fav').addEventListener('click', () => toggleSaved());
 $('list-form').addEventListener('submit', (event) => { event.preventDefault(); saveQueue(); });
@@ -1023,6 +1078,27 @@ async function faceOf(item) {
   sceneSince = performance.now();
 }
 
+/** The cover's colours, spread behind the immersive view: the cover drawn eight pixels wide and stretched, so only
+ *  its light and colour remain. It is the artwork, not a picture of the sound. */
+async function aura(item, holder = $('now-aura'), wide = 8, tall = 8, light = 0.42) {
+  let address = '';
+  try { address = (await firstAddress(await item.cover(320))).replace(/^big:/, ''); } catch { address = ''; }
+  if (holder.dataset.of !== item.id) return;
+  if (!address) { holder.replaceChildren(); return; }
+  const img = new Image();
+  img.onload = () => {
+    if (holder.dataset.of !== item.id) return;
+    const canvas = h('canvas', { class: 'absolute inset-0 w-full h-full' });
+    canvas.width = wide; canvas.height = tall;
+    const pen = canvas.getContext('2d');
+    pen.globalAlpha = light;
+    pen.drawImage(img, 0, 0, wide, tall);
+    holder.replaceChildren(canvas);
+  };
+  img.onerror = () => { if (holder.dataset.of === item.id) holder.replaceChildren(); };
+  img.src = address;
+}
+
 function drawNow() {
   if ($('now').hidden || !current) return;
   const rep = playingRep();
@@ -1034,14 +1110,17 @@ function drawNow() {
   $('stage').hidden = quiet;
   $('now-still').hidden = !quiet;
   $('now-space').hidden = quiet;
-  $('now-why').hidden = !motion; // the reason is given only when the app, not the listener, holds the picture back
+  $('now-why').hidden = !motion || remote.active; // the reason is given only when the app, not the listener, holds the picture back
   $('now-lock').hidden = !motion;
   $('now-motion').setAttribute('aria-pressed', String(motion));
   $('now-motion').setAttribute('data-state', motion ? 'on' : 'off');
   $('now-motion').setAttribute('aria-label', motion ? 'Animation: on' : 'Animation: off');
   $('motion-on').hidden = !motion;
   $('motion-off').hidden = motion;
-  if (quiet) drawCover($('now-art'), current, 320);
+  if (quiet) drawCover($('now-art'), current, 600);
+  $('now-aura').hidden = !quiet;
+  if (quiet && $('now-aura').dataset.of !== current.id) { $('now-aura').dataset.of = current.id; aura(current); }
+  placeRemote();
 }
 
 /** Once a second: may the picture react, how hard, and at what detail. */
@@ -1101,6 +1180,7 @@ function closeNow() {
   clearInterval(watching);
   clearTimeout(idle);
   if (visual) visual.stop();
+  placeRemote();
 }
 // The words and buttons step back when the pointer rests, and return when it moves.
 function stir() {

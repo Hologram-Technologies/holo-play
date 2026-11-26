@@ -51,7 +51,17 @@
   // ---- catalogue
   const IT = 'https://itunes.apple.com';
   /** A catalogue read: through the holospace where it offers one, since iTunes refuses a page with no origin. */
-  const it = async (url) => ((await offered).length ? JSON.parse(await shellAsk('holospaceCatalogue', { url })) : json(url));
+  const read = async (url) => ((await offered).length ? JSON.parse(await shellAsk('holospaceCatalogue', { url })) : json(url));
+  const readKept = new Map();
+  const it = (url) => {
+    if (!readKept.has(url)) {
+      const answer = read(url);
+      readKept.set(url, answer);
+      answer.catch(() => readKept.delete(url)); // a failure is not an answer, and is asked again
+      if (readKept.size > 300) readKept.delete(readKept.keys().next().value);
+    }
+    return readKept.get(url);
+  };
   const art = (url, size) => String(url || '').replace(/\/\d+x\d+bb\./, `/${size}x${size}bb.`);
   const song = (r) => ({
     id: `it:${r.trackId}`, source: 'catalogue', title: r.trackName, artist: r.artistName, album: r.collectionName || '',

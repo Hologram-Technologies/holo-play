@@ -395,3 +395,50 @@ Against a local copy of the published shell release with the two channels added,
 - The dock covers the lower right of the page, 384 by 216. A window too small for it refuses the song.
 - Artist and album pages from the fast catalogue were not opened.
 
+
+## Cover tile and the search box, 2026-11-26
+
+- Owner's decision: the YouTube player is not hidden (its terms forbid that); it is shown as a 200 by 200 cover at
+  the lower left, the least size PL-03 allows.
+- Search: results stay on the page while typing and each group is replaced when its answer comes; catalogue
+  answers are kept for the session; the sources are asked 70 ms after the last key (180 ms under three letters);
+  Enter asks at once, Escape clears, focus selects, `/` and Ctrl+K reach the box.
+- Gates: `build` and `verify`, 51 theorems, 113 of 113 vectors.
+- Seen in the patched holospace: "ben" then " bohmer" typed a second apart; the first list stayed until the second
+  replaced it; "Rust" played in the 200-pixel tile.
+- Not measured: the time from key to results in milliseconds. Not seen: the tile on a narrow window, where it
+  covers the start of list rows.
+- Sound quality on a YouTube song is YouTube's: the embedded player gives no control over the audio stream. Holo
+  Play's own rule (HP-01, PL-01) already prefers a lossless or full stream it can play itself over the player.
+
+## The player as the cover, 2026-11-26
+
+- In the immersive view a held player takes the cover's own place: centred, up to 448 pixels square, with the
+  cover's colours spread behind it (the cover drawn eight pixels wide and stretched; it is artwork, not a picture
+  of the sound). Outside that view it is the 200-pixel tile. The model is asked `place` before each move.
+- The shell takes `plain: true` on `load` and asks YouTube for no control bar; Holo Play's own transport drives it.
+- Gates: Holo Play `build` and `verify`, 51 theorems, 113 of 113 vectors. Shell `test/player.test.mjs` 6 of 6.
+- Seen in the patched holospace: a top song playing in the tile, then `v`: the player moved to the centre over the
+  coloured backdrop, title and transport below.
+- Not seen: closing the view (the move back to the tile), a window resize, a small window. YouTube still draws its
+  own title and "More videos" strip on hover and when paused; that is YouTube's and is not covered.
+
+## The player in the bar, 2026-11-26
+
+- The 200 by 200 player now stands in the player bar where the cover is: its left on the cover's left, its foot on
+  the cover row's line, the title beside it in a slot the bar keeps for it. The bar's small cover is hidden while
+  it shows. 200 by 200 is the least YouTube's terms and PL-03 allow; the bar is shorter, so the player rises above it.
+- Gates: `build` and `verify`, 51 theorems, 113 of 113 vectors.
+- Seen in the patched holospace: a chart song playing with the player in the bar's slot and the title beside it.
+- Not seen: a narrow window, where the slot takes most of the bar's width; the move to and from the immersive view
+  after this change.
+
+## The glass bar, 2026-11-26
+
+- Owner's direction: no fuzzy coloured backdrop in the bar; translucent glass instead. The player bar now lies over
+  the page (`bg-card/60`, `backdrop-blur`), and the page keeps room at its foot so its last rows scroll clear.
+- While a held player shows, the bar grows to hold the 200 by 200 player whole, with a large title, the artist and
+  the transport beside it. For every other source the bar is its usual height, also glass.
+- Gates: `build` and `verify`, 51 theorems, 113 of 113 vectors.
+- Seen in the patched holospace: a chart song in the tall bar, shelves showing blurred through it while scrolling.
+- Not seen: the light theme, a narrow window, the queue and sound sheets over the glass bar.
