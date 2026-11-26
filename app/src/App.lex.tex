@@ -1,0 +1,877 @@
+\begin{lexlean}{App}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{prism.arch@1.0.0}
+\importmodule{Foundation.Bytes}
+\importmodule{Foundation.View.Text.V1.Model}
+\title{Text application model}
+\begin{semanticmodule}
+definition{name: classLossless, parameters: [], result: Nat, body: 2}
+
+definition{name: orderTie, parameters: [], result: Nat, body: 0}
+
+definition{name: orderFirst, parameters: [], result: Nat, body: 1}
+
+definition{name: orderSecond, parameters: [], result: Nat, body: 2}
+
+definition{
+  name: score,
+  parameters: [class : Nat, bits : Nat, kbps : Nat],
+  result: Nat,
+  body: (if (class =? (classLossless)) then (1000000 + bits) else kbps)
+}
+
+definition{
+  name: rank,
+  parameters: [class : Nat, bits : Nat, kbps : Nat, otherClass : Nat, otherBits : Nat, otherKbps : Nat],
+  result: Nat,
+  body: (if ((score otherClass otherBits otherKbps) <? (score class bits kbps)) then (orderFirst) else (if ((score class bits kbps) <? (score otherClass otherBits otherKbps)) then (orderSecond) else (orderTie)))
+}
+
+definition{
+  name: breaksLosslessFirst,
+  parameters: [class : Nat, bits : Nat, kbps : Nat, otherClass : Nat, otherBits : Nat, otherKbps : Nat],
+  result: Bool,
+  body: ((class =? (classLossless)) && ((not (otherClass =? (classLossless))) && ((otherKbps <=? 999999) && (not ((rank class bits kbps otherClass otherBits otherKbps) =? (orderFirst))))))
+}
+
+theorem{
+  name: lossless_outranks_lossy,
+  parameters: [class : Nat, bits : Nat, kbps : Nat, otherClass : Nat, otherBits : Nat, otherKbps : Nat],
+  statement: ((breaksLosslessFirst class bits kbps otherClass otherBits otherKbps) = false),
+  proof: linear_arithmetic{definitions: [breaksLosslessFirst, classLossless, orderFirst, orderSecond, orderTie, rank, score]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksDeeperFirst,
+  parameters: [class : Nat, bits : Nat, kbps : Nat, otherClass : Nat, otherBits : Nat, otherKbps : Nat],
+  result: Bool,
+  body: ((class =? (classLossless)) && ((otherClass =? (classLossless)) && ((otherBits <? bits) && (not ((rank class bits kbps otherClass otherBits otherKbps) =? (orderFirst))))))
+}
+
+theorem{
+  name: deeper_lossless_wins,
+  parameters: [class : Nat, bits : Nat, kbps : Nat, otherClass : Nat, otherBits : Nat, otherKbps : Nat],
+  statement: ((breaksDeeperFirst class bits kbps otherClass otherBits otherKbps) = false),
+  proof: linear_arithmetic{definitions: [breaksDeeperFirst, classLossless, orderFirst, orderSecond, orderTie, rank, score]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksBitrateFirst,
+  parameters: [class : Nat, bits : Nat, kbps : Nat, otherClass : Nat, otherBits : Nat, otherKbps : Nat],
+  result: Bool,
+  body: ((not (class =? (classLossless))) && ((not (otherClass =? (classLossless))) && ((otherKbps <? kbps) && (not ((rank class bits kbps otherClass otherBits otherKbps) =? (orderFirst))))))
+}
+
+theorem{
+  name: higher_bitrate_wins,
+  parameters: [class : Nat, bits : Nat, kbps : Nat, otherClass : Nat, otherBits : Nat, otherKbps : Nat],
+  statement: ((breaksBitrateFirst class bits kbps otherClass otherBits otherKbps) = false),
+  proof: linear_arithmetic{definitions: [breaksBitrateFirst, classLossless, orderFirst, orderSecond, orderTie, rank, score]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksRankAntisymmetry,
+  parameters: [class : Nat, bits : Nat, kbps : Nat, otherClass : Nat, otherBits : Nat, otherKbps : Nat],
+  result: Bool,
+  body: (((rank class bits kbps otherClass otherBits otherKbps) =? (orderFirst)) && (not ((rank otherClass otherBits otherKbps class bits kbps) =? (orderSecond))))
+}
+
+theorem{
+  name: rank_is_antisymmetric,
+  parameters: [class : Nat, bits : Nat, kbps : Nat, otherClass : Nat, otherBits : Nat, otherKbps : Nat],
+  statement: ((breaksRankAntisymmetry class bits kbps otherClass otherBits otherKbps) = false),
+  proof: linear_arithmetic{definitions: [breaksRankAntisymmetry, classLossless, orderFirst, orderSecond, orderTie, rank, score]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksRankTie,
+  parameters: [class : Nat, bits : Nat, kbps : Nat, otherClass : Nat, otherBits : Nat, otherKbps : Nat],
+  result: Bool,
+  body: (((rank class bits kbps otherClass otherBits otherKbps) =? (orderTie)) && (not ((score class bits kbps) =? (score otherClass otherBits otherKbps))))
+}
+
+theorem{
+  name: rank_ties_only_equal_scores,
+  parameters: [class : Nat, bits : Nat, kbps : Nat, otherClass : Nat, otherBits : Nat, otherKbps : Nat],
+  statement: ((breaksRankTie class bits kbps otherClass otherBits otherKbps) = false),
+  proof: linear_arithmetic{definitions: [breaksRankTie, classLossless, orderFirst, orderSecond, orderTie, rank, score]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{name: retryExhausted, parameters: [], result: Nat, body: 0}
+
+definition{name: retryAdvance, parameters: [], result: Nat, body: 1}
+
+definition{
+  name: retry,
+  parameters: [tried : Nat, count : Nat],
+  result: Nat,
+  body: (if (tried <? count) then (retryAdvance) else (retryExhausted))
+}
+
+definition{
+  name: breaksRetryRange,
+  parameters: [tried : Nat, count : Nat],
+  result: Bool,
+  body: (((retry tried count) =? (retryAdvance)) && (not (tried <? count)))
+}
+
+theorem{
+  name: retry_stays_in_range,
+  parameters: [tried : Nat, count : Nat],
+  statement: ((breaksRetryRange tried count) = false),
+  proof: linear_arithmetic{definitions: [breaksRetryRange, retry, retryAdvance, retryExhausted]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksRetryEnds,
+  parameters: [tried : Nat, count : Nat],
+  result: Bool,
+  body: ((count <=? tried) && (not ((retry tried count) =? (retryExhausted))))
+}
+
+theorem{
+  name: retry_ends,
+  parameters: [tried : Nat, count : Nat],
+  statement: ((breaksRetryEnds tried count) = false),
+  proof: linear_arithmetic{definitions: [breaksRetryEnds, retry, retryAdvance, retryExhausted]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{name: routeDirect, parameters: [], result: Nat, body: 0}
+
+definition{name: routeEngine, parameters: [], result: Nat, body: 1}
+
+definition{
+  name: route,
+  parameters: [readable : Nat, enhance : Nat],
+  result: Nat,
+  body: (if ((readable =? 1) && (enhance =? 1)) then (routeEngine) else (routeDirect))
+}
+
+definition{
+  name: breaksRouteReadable,
+  parameters: [readable : Nat, enhance : Nat],
+  result: Bool,
+  body: ((not (readable =? 1)) && ((route readable enhance) =? (routeEngine)))
+}
+
+theorem{
+  name: unreadable_never_reaches_engine,
+  parameters: [readable : Nat, enhance : Nat],
+  statement: ((breaksRouteReadable readable enhance) = false),
+  proof: linear_arithmetic{definitions: [breaksRouteReadable, route, routeDirect, routeEngine]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksRouteEngine,
+  parameters: [readable : Nat, enhance : Nat],
+  result: Bool,
+  body: (((readable =? 1) && (enhance =? 1)) && (not ((route readable enhance) =? (routeEngine))))
+}
+
+theorem{
+  name: readable_enhanced_reaches_engine,
+  parameters: [readable : Nat, enhance : Nat],
+  statement: ((breaksRouteEngine readable enhance) = false),
+  proof: linear_arithmetic{definitions: [breaksRouteEngine, route, routeDirect, routeEngine]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{name: moveStop, parameters: [], result: Nat, body: 0}
+
+definition{name: movePlay, parameters: [], result: Nat, body: 1}
+
+definition{name: moveReplay, parameters: [], result: Nat, body: 2}
+
+definition{name: moveRestart, parameters: [], result: Nat, body: 3}
+
+definition{name: moveKeep, parameters: [], result: Nat, body: 4}
+
+definition{name: moveEmpty, parameters: [], result: Nat, body: 5}
+
+definition{
+  name: aheadMove,
+  parameters: [index : Nat, length : Nat, repeat : Nat, auto : Nat],
+  result: Nat,
+  body: (if (length =? 0) then (moveStop) else (if ((repeat =? 2) && (auto =? 1)) then (moveReplay) else (if ((index + 1) <? length) then (movePlay) else (if (repeat =? 1) then (movePlay) else (moveStop)))))
+}
+
+definition{
+  name: aheadIndex,
+  parameters: [index : Nat, length : Nat, repeat : Nat, auto : Nat],
+  result: Nat,
+  body: (if ((index + 1) <? length) then (index + 1) else 0)
+}
+
+definition{
+  name: breaksAheadBounds,
+  parameters: [index : Nat, length : Nat, repeat : Nat, auto : Nat],
+  result: Bool,
+  body: (((aheadMove index length repeat auto) =? (movePlay)) && (not ((aheadIndex index length repeat auto) <? length)))
+}
+
+theorem{
+  name: ahead_stays_in_queue,
+  parameters: [index : Nat, length : Nat, repeat : Nat, auto : Nat],
+  statement: ((breaksAheadBounds index length repeat auto) = false),
+  proof: linear_arithmetic{definitions: [aheadIndex, aheadMove, breaksAheadBounds, moveEmpty, moveKeep, movePlay, moveReplay, moveRestart, moveStop]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksAheadStops,
+  parameters: [index : Nat, length : Nat, repeat : Nat, auto : Nat],
+  result: Bool,
+  body: (((repeat =? 0) && (length <=? (index + 1))) && ((aheadMove index length repeat auto) =? (movePlay)))
+}
+
+theorem{
+  name: ahead_stops_at_the_end,
+  parameters: [index : Nat, length : Nat, repeat : Nat, auto : Nat],
+  statement: ((breaksAheadStops index length repeat auto) = false),
+  proof: linear_arithmetic{definitions: [aheadIndex, aheadMove, breaksAheadStops, moveEmpty, moveKeep, movePlay, moveReplay, moveRestart, moveStop]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: priorMove,
+  parameters: [index : Nat, seconds : Nat],
+  result: Nat,
+  body: (if (3 <? seconds) then (moveRestart) else (if (0 <? index) then (movePlay) else (moveRestart)))
+}
+
+definition{
+  name: priorIndex,
+  parameters: [index : Nat, seconds : Nat],
+  result: Nat,
+  body: (prim subtract index 1 : Nat)
+}
+
+definition{
+  name: breaksPriorBounds,
+  parameters: [index : Nat, seconds : Nat],
+  result: Bool,
+  body: (((priorMove index seconds) =? (movePlay)) && (not ((priorIndex index seconds) <? index)))
+}
+
+theorem{
+  name: prior_stays_in_queue,
+  parameters: [index : Nat, seconds : Nat],
+  statement: ((breaksPriorBounds index seconds) = false),
+  proof: linear_arithmetic{definitions: [breaksPriorBounds, moveEmpty, moveKeep, movePlay, moveReplay, moveRestart, moveStop, priorIndex, priorMove]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksPriorRestart,
+  parameters: [index : Nat, seconds : Nat],
+  result: Bool,
+  body: ((3 <? seconds) && (not ((priorMove index seconds) =? (moveRestart))))
+}
+
+theorem{
+  name: prior_restarts_after_three_seconds,
+  parameters: [index : Nat, seconds : Nat],
+  statement: ((breaksPriorRestart index seconds) = false),
+  proof: linear_arithmetic{definitions: [breaksPriorRestart, moveEmpty, moveKeep, movePlay, moveReplay, moveRestart, moveStop, priorIndex, priorMove]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: stripMove,
+  parameters: [index : Nat, length : Nat, at : Nat],
+  result: Nat,
+  body: (if (length <=? 1) then (moveEmpty) else (if (at =? index) then (movePlay) else (moveKeep)))
+}
+
+definition{
+  name: stripIndex,
+  parameters: [index : Nat, length : Nat, at : Nat],
+  result: Nat,
+  body: (if (at <? index) then (prim subtract index 1 : Nat) else (if ((at =? index) && (length <=? (index + 1))) then (prim subtract index 1 : Nat) else index))
+}
+
+definition{
+  name: breaksStripBounds,
+  parameters: [index : Nat, length : Nat, at : Nat],
+  result: Bool,
+  body: ((((index <? length) && (at <? length)) && (not ((stripMove index length at) =? (moveEmpty)))) && (not (((stripIndex index length at) + 1) <? length)))
+}
+
+theorem{
+  name: strip_stays_in_queue,
+  parameters: [index : Nat, length : Nat, at : Nat],
+  statement: ((breaksStripBounds index length at) = false),
+  proof: linear_arithmetic{definitions: [breaksStripBounds, moveEmpty, moveKeep, movePlay, moveReplay, moveRestart, moveStop, stripIndex, stripMove]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{name: linkExternal, parameters: [], result: Nat, body: 0}
+
+definition{name: linkTrack, parameters: [], result: Nat, body: 1}
+
+definition{name: linkStream, parameters: [], result: Nat, body: 2}
+
+definition{name: linkAlbum, parameters: [], result: Nat, body: 3}
+
+definition{name: linkCompanion, parameters: [], result: Nat, body: 4}
+
+definition{name: linkImport, parameters: [], result: Nat, body: 5}
+
+definition{
+  name: link,
+  parameters: [extension : Nat, host : Nat, companion : Nat],
+  result: Nat,
+  body: (if ((host =? 2) || (host =? 3)) then (if (companion =? 1) then (linkCompanion) else (linkExternal)) else (if (host =? 1) then (linkAlbum) else (if (extension =? 2) then (linkStream) else (if (extension =? 1) then (linkTrack) else (if (companion =? 1) then (linkImport) else (linkExternal))))))
+}
+
+definition{
+  name: breaksLinkCompanion,
+  parameters: [extension : Nat, host : Nat, companion : Nat],
+  result: Bool,
+  body: ((not (companion =? 1)) && (((link extension host companion) =? (linkCompanion)) || ((link extension host companion) =? (linkImport))))
+}
+
+theorem{
+  name: companion_link_needs_the_companion,
+  parameters: [extension : Nat, host : Nat, companion : Nat],
+  statement: ((breaksLinkCompanion extension host companion) = false),
+  proof: linear_arithmetic{definitions: [breaksLinkCompanion, link, linkAlbum, linkCompanion, linkExternal, linkImport, linkStream, linkTrack]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksLinkTrack,
+  parameters: [extension : Nat, host : Nat, companion : Nat],
+  result: Bool,
+  body: (((host =? 0) && (extension =? 1)) && (not ((link extension host companion) =? (linkTrack))))
+}
+
+theorem{
+  name: audio_file_is_a_track,
+  parameters: [extension : Nat, host : Nat, companion : Nat],
+  statement: ((breaksLinkTrack extension host companion) = false),
+  proof: linear_arithmetic{definitions: [breaksLinkTrack, link, linkAlbum, linkCompanion, linkExternal, linkImport, linkStream, linkTrack]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{name: offerHide, parameters: [], result: Nat, body: 0}
+
+definition{name: offerShow, parameters: [], result: Nat, body: 1}
+
+definition{
+  name: offer,
+  parameters: [kind : Nat, companion : Nat],
+  result: Nat,
+  body: (if (kind =? 0) then (offerShow) else (if ((kind =? 1) && (companion =? 1)) then (offerShow) else (offerHide)))
+}
+
+definition{
+  name: breaksOfferCompanion,
+  parameters: [kind : Nat, companion : Nat],
+  result: Bool,
+  body: (((not (kind =? 0)) && (not (companion =? 1))) && ((offer kind companion) =? (offerShow)))
+}
+
+theorem{
+  name: companion_source_needs_the_companion,
+  parameters: [kind : Nat, companion : Nat],
+  statement: ((breaksOfferCompanion kind companion) = false),
+  proof: linear_arithmetic{definitions: [breaksOfferCompanion, offer, offerHide, offerShow]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksOfferDirect,
+  parameters: [kind : Nat, companion : Nat],
+  result: Bool,
+  body: ((kind =? 0) && (not ((offer kind companion) =? (offerShow))))
+}
+
+theorem{
+  name: direct_source_is_always_offered,
+  parameters: [kind : Nat, companion : Nat],
+  statement: ((breaksOfferDirect kind companion) = false),
+  proof: linear_arithmetic{definitions: [breaksOfferDirect, offer, offerHide, offerShow]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{name: seekRestart, parameters: [], result: Nat, body: 0}
+
+definition{name: seekResume, parameters: [], result: Nat, body: 1}
+
+definition{name: seekFinished, parameters: [], result: Nat, body: 2}
+
+definition{
+  name: seeks,
+  parameters: [position : Nat, duration : Nat],
+  result: Nat,
+  body: (if (position <? 5) then (seekRestart) else (if (duration <=? (position + 30)) then (seekFinished) else (seekResume)))
+}
+
+definition{
+  name: breaksResumeInside,
+  parameters: [position : Nat, duration : Nat],
+  result: Bool,
+  body: (((seeks position duration) =? (seekResume)) && (not ((position + 30) <? duration)))
+}
+
+theorem{
+  name: resume_stays_inside_the_item,
+  parameters: [position : Nat, duration : Nat],
+  statement: ((breaksResumeInside position duration) = false),
+  proof: linear_arithmetic{definitions: [breaksResumeInside, seekFinished, seekRestart, seekResume, seeks]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksResumeFinished,
+  parameters: [position : Nat, duration : Nat],
+  result: Bool,
+  body: (((5 <=? position) && (duration <=? (position + 30))) && (not ((seeks position duration) =? (seekFinished))))
+}
+
+theorem{
+  name: near_the_end_is_finished,
+  parameters: [position : Nat, duration : Nat],
+  statement: ((breaksResumeFinished position duration) = false),
+  proof: linear_arithmetic{definitions: [breaksResumeFinished, seekFinished, seekRestart, seekResume, seeks]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{name: pickNone, parameters: [], result: Nat, body: 0}
+
+definition{name: pickCompanion, parameters: [], result: Nat, body: 1}
+
+definition{name: pickOpen, parameters: [], result: Nat, body: 2}
+
+definition{name: pickPreview, parameters: [], result: Nat, body: 3}
+
+definition{
+  name: pick,
+  parameters: [companion : Nat, open : Nat, preview : Nat],
+  result: Nat,
+  body: (if (companion =? 1) then (pickCompanion) else (if (open =? 1) then (pickOpen) else (if (preview =? 1) then (pickPreview) else (pickNone))))
+}
+
+definition{
+  name: breaksPickFull,
+  parameters: [companion : Nat, open : Nat, preview : Nat],
+  result: Bool,
+  body: (((companion =? 1) || (open =? 1)) && ((pick companion open preview) =? (pickPreview)))
+}
+
+theorem{
+  name: full_source_beats_preview,
+  parameters: [companion : Nat, open : Nat, preview : Nat],
+  statement: ((breaksPickFull companion open preview) = false),
+  proof: linear_arithmetic{definitions: [breaksPickFull, pick, pickCompanion, pickNone, pickOpen, pickPreview]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksPickPreview,
+  parameters: [companion : Nat, open : Nat, preview : Nat],
+  result: Bool,
+  body: (((pick companion open preview) =? (pickPreview)) && (not (preview =? 1)))
+}
+
+theorem{
+  name: preview_needs_a_preview,
+  parameters: [companion : Nat, open : Nat, preview : Nat],
+  statement: ((breaksPickPreview companion open preview) = false),
+  proof: linear_arithmetic{definitions: [breaksPickPreview, pick, pickCompanion, pickNone, pickOpen, pickPreview]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksPickCompanion,
+  parameters: [companion : Nat, open : Nat, preview : Nat],
+  result: Bool,
+  body: (((pick companion open preview) =? (pickCompanion)) && (not (companion =? 1)))
+}
+
+theorem{
+  name: companion_pick_needs_the_companion,
+  parameters: [companion : Nat, open : Nat, preview : Nat],
+  statement: ((breaksPickCompanion companion open preview) = false),
+  proof: linear_arithmetic{definitions: [breaksPickCompanion, pick, pickCompanion, pickNone, pickOpen, pickPreview]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksPickSomething,
+  parameters: [companion : Nat, open : Nat, preview : Nat],
+  result: Bool,
+  body: ((((companion =? 1) || (open =? 1)) || (preview =? 1)) && ((pick companion open preview) =? (pickNone)))
+}
+
+theorem{
+  name: something_plays_when_anything_can,
+  parameters: [companion : Nat, open : Nat, preview : Nat],
+  statement: ((breaksPickSomething companion open preview) = false),
+  proof: linear_arithmetic{definitions: [breaksPickSomething, pick, pickCompanion, pickNone, pickOpen, pickPreview]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: accepts,
+  parameters: [length : Nat],
+  result: Bool,
+  body: ((length =? 19) || ((length =? 26) || ((length =? 33) || (length =? 47))))
+}
+
+definition{
+  name: breaksAcceptsOnly,
+  parameters: [length : Nat],
+  result: Bool,
+  body: ((accepts length) && ((not (length =? 19)) && ((not (length =? 26)) && ((not (length =? 33)) && (not (length =? 47))))))
+}
+
+theorem{
+  name: accepts_exactly_a_request,
+  parameters: [length : Nat],
+  statement: ((breaksAcceptsOnly length) = false),
+  proof: linear_arithmetic{definitions: [accepts, breaksAcceptsOnly]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: codeAt,
+  parameters: [value : Bytes, offset : Nat],
+  result: Nat,
+  body: (match (Foundation.Bytes::byteAt value offset)
+    | Option.none => 0
+    | Option.some byte => (prim to_nat byte : Nat)),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: isDigit,
+  parameters: [code : Nat],
+  result: Bool,
+  body: ((48 <=? code) && (code <=? 57))
+}
+
+definition{
+  name: digitsFrom,
+  parameters: [value : Bytes, offset : Nat, remaining : Nat],
+  result: Bool,
+  body: (match remaining
+    | Nat.zero => true
+    | Nat.succ rest => ((isDigit (codeAt value offset)) && (digitsFrom value (offset + 1) rest))),
+  axioms: [Quot.sound, propext],
+  recursive_argument: remaining
+}
+
+definition{
+  name: decimalFrom,
+  parameters: [value : Bytes, offset : Nat, remaining : Nat, accumulated : Nat],
+  result: Nat,
+  body: (match remaining
+    | Nat.zero => accumulated
+    | Nat.succ rest => (decimalFrom value (offset + 1) rest ((prim multiply accumulated 10 : Nat) + (prim subtract (codeAt value offset) 48 : Nat)))),
+  axioms: [Quot.sound, propext],
+  recursive_argument: remaining
+}
+
+definition{
+  name: fieldOk,
+  parameters: [value : Bytes, offset : Nat],
+  result: Bool,
+  body: ((digitsFrom value offset 6) && ((codeAt value (offset + 6)) =? 32)),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: lastFieldOk,
+  parameters: [value : Bytes, offset : Nat],
+  result: Bool,
+  body: (digitsFrom value offset 6),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: field,
+  parameters: [value : Bytes, offset : Nat],
+  result: Nat,
+  body: (decimalFrom value offset 6 0),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysRanks,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 114) && (((codeAt value 1) =? 97) && (((codeAt value 2) =? 110) && (((codeAt value 3) =? 107) && (((codeAt value 4) =? 115) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: ranksRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 47) && ((saysRanks value) && ((fieldOk value 6) && ((fieldOk value 13) && ((fieldOk value 20) && ((fieldOk value 27) && ((fieldOk value 34) && (lastFieldOk value 41)))))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysRetry,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 114) && (((codeAt value 1) =? 101) && (((codeAt value 2) =? 116) && (((codeAt value 3) =? 114) && (((codeAt value 4) =? 121) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: retryRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 19) && ((saysRetry value) && ((fieldOk value 6) && (lastFieldOk value 13)))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysRoute,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 114) && (((codeAt value 1) =? 111) && (((codeAt value 2) =? 117) && (((codeAt value 3) =? 116) && (((codeAt value 4) =? 101) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: routeRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 19) && ((saysRoute value) && ((fieldOk value 6) && (lastFieldOk value 13)))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysAhead,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 97) && (((codeAt value 1) =? 104) && (((codeAt value 2) =? 101) && (((codeAt value 3) =? 97) && (((codeAt value 4) =? 100) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: aheadRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 33) && ((saysAhead value) && ((fieldOk value 6) && ((fieldOk value 13) && ((fieldOk value 20) && (lastFieldOk value 27)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysPrior,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 112) && (((codeAt value 1) =? 114) && (((codeAt value 2) =? 105) && (((codeAt value 3) =? 111) && (((codeAt value 4) =? 114) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: priorRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 19) && ((saysPrior value) && ((fieldOk value 6) && (lastFieldOk value 13)))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysStrip,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 115) && (((codeAt value 1) =? 116) && (((codeAt value 2) =? 114) && (((codeAt value 3) =? 105) && (((codeAt value 4) =? 112) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: stripRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 26) && ((saysStrip value) && ((fieldOk value 6) && ((fieldOk value 13) && (lastFieldOk value 20))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysLinks,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 108) && (((codeAt value 1) =? 105) && (((codeAt value 2) =? 110) && (((codeAt value 3) =? 107) && (((codeAt value 4) =? 115) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: linksRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 26) && ((saysLinks value) && ((fieldOk value 6) && ((fieldOk value 13) && (lastFieldOk value 20))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysOffer,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 111) && (((codeAt value 1) =? 102) && (((codeAt value 2) =? 102) && (((codeAt value 3) =? 101) && (((codeAt value 4) =? 114) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: offerRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 19) && ((saysOffer value) && ((fieldOk value 6) && (lastFieldOk value 13)))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysSeeks,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 115) && (((codeAt value 1) =? 101) && (((codeAt value 2) =? 101) && (((codeAt value 3) =? 107) && (((codeAt value 4) =? 115) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: seeksRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 19) && ((saysSeeks value) && ((fieldOk value 6) && (lastFieldOk value 13)))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysPicks,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 112) && (((codeAt value 1) =? 105) && (((codeAt value 2) =? 99) && (((codeAt value 3) =? 107) && (((codeAt value 4) =? 115) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: picksRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 26) && ((saysPicks value) && ((fieldOk value 6) && ((fieldOk value 13) && (lastFieldOk value 20))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{name: digitGlyphs, parameters: [], result: Bytes, body: (prim utf8_encode "0123456789" : Bytes)}
+
+definition{
+  name: glyph,
+  parameters: [digit : Nat],
+  result: Bytes,
+  body: (match (prim slice (digitGlyphs) digit 1 : (Option Bytes))
+    | Option.none => (prim utf8_encode "0" : Bytes)
+    | Option.some bytes => bytes),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: sixDigits,
+  parameters: [number : Nat],
+  result: Bytes,
+  body: (prim append (glyph (prim remainder (prim quotient number 100000 0 : Nat) 10 0 : Nat)) (prim append (glyph (prim remainder (prim quotient number 10000 0 : Nat) 10 0 : Nat)) (prim append (glyph (prim remainder (prim quotient number 1000 0 : Nat) 10 0 : Nat)) (prim append (glyph (prim remainder (prim quotient number 100 0 : Nat) 10 0 : Nat)) (prim append (glyph (prim remainder (prim quotient number 10 0 : Nat) 10 0 : Nat)) (glyph (prim remainder (prim quotient number 1 0 : Nat) 10 0 : Nat)) : Bytes) : Bytes) : Bytes) : Bytes) : Bytes),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: numbered,
+  parameters: [word : Bytes, number : Nat],
+  result: Bytes,
+  body: (prim append word (sixDigits number) : Bytes),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: rankText,
+  parameters: [answer : Nat],
+  result: Bytes,
+  body: (if (answer =? (orderFirst)) then (prim utf8_encode "first" : Bytes) else (if (answer =? (orderSecond)) then (prim utf8_encode "second" : Bytes) else (prim utf8_encode "tie" : Bytes))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: retryText,
+  parameters: [answer : Nat],
+  result: Bytes,
+  body: (if (answer =? (retryAdvance)) then (prim utf8_encode "advance" : Bytes) else (prim utf8_encode "exhausted" : Bytes)),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: routeText,
+  parameters: [answer : Nat],
+  result: Bytes,
+  body: (if (answer =? (routeEngine)) then (prim utf8_encode "engine" : Bytes) else (prim utf8_encode "direct" : Bytes)),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: moveText,
+  parameters: [answer : Nat, index : Nat],
+  result: Bytes,
+  body: (if (answer =? (movePlay)) then (numbered (prim utf8_encode "play " : Bytes) index) else (if (answer =? (moveKeep)) then (numbered (prim utf8_encode "keep " : Bytes) index) else (if (answer =? (moveReplay)) then (prim utf8_encode "replay" : Bytes) else (if (answer =? (moveRestart)) then (prim utf8_encode "restart" : Bytes) else (if (answer =? (moveEmpty)) then (prim utf8_encode "empty" : Bytes) else (prim utf8_encode "stop" : Bytes)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: linkText,
+  parameters: [answer : Nat],
+  result: Bytes,
+  body: (if (answer =? (linkTrack)) then (prim utf8_encode "track" : Bytes) else (if (answer =? (linkStream)) then (prim utf8_encode "stream" : Bytes) else (if (answer =? (linkAlbum)) then (prim utf8_encode "album" : Bytes) else (if (answer =? (linkCompanion)) then (prim utf8_encode "companion" : Bytes) else (if (answer =? (linkImport)) then (prim utf8_encode "import" : Bytes) else (prim utf8_encode "external" : Bytes)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: offerText,
+  parameters: [answer : Nat],
+  result: Bytes,
+  body: (if (answer =? (offerShow)) then (prim utf8_encode "offer" : Bytes) else (prim utf8_encode "hide" : Bytes)),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: seekText,
+  parameters: [answer : Nat],
+  result: Bytes,
+  body: (if (answer =? (seekResume)) then (prim utf8_encode "resume" : Bytes) else (if (answer =? (seekFinished)) then (prim utf8_encode "finished" : Bytes) else (prim utf8_encode "restart" : Bytes))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: pickText,
+  parameters: [answer : Nat],
+  result: Bytes,
+  body: (if (answer =? (pickCompanion)) then (prim utf8_encode "companion" : Bytes) else (if (answer =? (pickOpen)) then (prim utf8_encode "open" : Bytes) else (if (answer =? (pickPreview)) then (prim utf8_encode "preview" : Bytes) else (prim utf8_encode "none" : Bytes)))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: dispatch,
+  parameters: [value : Bytes],
+  result: Bytes,
+  body: (if (accepts (Foundation.Bytes::byteLength value)) then (if (ranksRequest value) then (rankText (rank (field value 6) (field value 13) (field value 20) (field value 27) (field value 34) (field value 41))) else (if (retryRequest value) then (retryText (retry (field value 6) (field value 13))) else (if (routeRequest value) then (routeText (route (field value 6) (field value 13))) else (if (aheadRequest value) then (moveText (aheadMove (field value 6) (field value 13) (field value 20) (field value 27)) (aheadIndex (field value 6) (field value 13) (field value 20) (field value 27))) else (if (priorRequest value) then (moveText (priorMove (field value 6) (field value 13)) (priorIndex (field value 6) (field value 13))) else (if (stripRequest value) then (moveText (stripMove (field value 6) (field value 13) (field value 20)) (stripIndex (field value 6) (field value 13) (field value 20))) else (if (linksRequest value) then (linkText (link (field value 6) (field value 13) (field value 20))) else (if (offerRequest value) then (offerText (offer (field value 6) (field value 13))) else (if (seeksRequest value) then (seekText (seeks (field value 6) (field value 13))) else (if (picksRequest value) then (pickText (pick (field value 6) (field value 13) (field value 20))) else (prim utf8_encode "invalid request" : Bytes))))))))))) else (prim utf8_encode "invalid request" : Bytes)),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: application,
+  parameters: [],
+  result: Foundation.View.Text.V1.Model::TextApplication,
+  body: (record Foundation.View.Text.V1.Model::TextApplication {profile := "prismpm/text-application/1", name := "Holo Play", cargoName := "prism-holo-play", cargoVersion := "0.1.0", cargoDescription := "Music, radio, podcasts and audiobooks in one player, with its playback decisions proved.", cargoRepository := "https://github.com/Hologram-Technologies/holo-play", cargoHomepage := "https://github.com/Hologram-Technologies/holo-play", libraryRoots := (cons "PrismHoloPlay.App.dispatch" (nil String)), acceptanceVectors := (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000002 000016 000900 000001 000000 000320" : Bytes), response := (prim utf8_encode "first" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 000320 000002 000016 000000" : Bytes), response := (prim utf8_encode "second" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000002 000024 000000 000002 000016 000000" : Bytes), response := (prim utf8_encode "first" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 000128 000001 000000 000320" : Bytes), response := (prim utf8_encode "second" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 000320 000001 000000 000320" : Bytes), response := (prim utf8_encode "tie" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 999999 000002 000000 000000" : Bytes), response := (prim utf8_encode "second" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000000 000002" : Bytes), response := (prim utf8_encode "advance" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000001 000002" : Bytes), response := (prim utf8_encode "advance" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000002 000002" : Bytes), response := (prim utf8_encode "exhausted" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000000 000000" : Bytes), response := (prim utf8_encode "exhausted" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000001 000001" : Bytes), response := (prim utf8_encode "engine" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000000 000001" : Bytes), response := (prim utf8_encode "direct" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000001 000000" : Bytes), response := (prim utf8_encode "direct" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000002 000001" : Bytes), response := (prim utf8_encode "direct" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000000 000003 000000 000001" : Bytes), response := (prim utf8_encode "play 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000002 000003 000000 000001" : Bytes), response := (prim utf8_encode "stop" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000002 000003 000001 000001" : Bytes), response := (prim utf8_encode "play 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000001 000003 000002 000001" : Bytes), response := (prim utf8_encode "replay" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000001 000003 000002 000000" : Bytes), response := (prim utf8_encode "play 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000000 000000 000001 000000" : Bytes), response := (prim utf8_encode "stop" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000000 000001 000001 000001" : Bytes), response := (prim utf8_encode "play 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000002 000001" : Bytes), response := (prim utf8_encode "play 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000002 000004" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000000 000000" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000001 000003" : Bytes), response := (prim utf8_encode "play 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000002 000005 000000" : Bytes), response := (prim utf8_encode "keep 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000002 000005 000002" : Bytes), response := (prim utf8_encode "play 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000004 000005 000004" : Bytes), response := (prim utf8_encode "play 000003" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000001 000005 000003" : Bytes), response := (prim utf8_encode "keep 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000000 000001 000000" : Bytes), response := (prim utf8_encode "empty" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000001 000000 000000" : Bytes), response := (prim utf8_encode "track" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000002 000000 000000" : Bytes), response := (prim utf8_encode "stream" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000001 000000" : Bytes), response := (prim utf8_encode "album" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000003 000001" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000003 000000" : Bytes), response := (prim utf8_encode "external" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000002 000001" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000000 000001" : Bytes), response := (prim utf8_encode "import" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000000 000000" : Bytes), response := (prim utf8_encode "external" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "offer 000000 000000" : Bytes), response := (prim utf8_encode "offer" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "offer 000001 000000" : Bytes), response := (prim utf8_encode "hide" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "offer 000001 000001" : Bytes), response := (prim utf8_encode "offer" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 000000 003600" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 000004 003600" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 001200 003600" : Bytes), response := (prim utf8_encode "resume" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 003570 003600" : Bytes), response := (prim utf8_encode "finished" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 003569 003600" : Bytes), response := (prim utf8_encode "resume" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 000050 000060" : Bytes), response := (prim utf8_encode "finished" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000001 000001 000001" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000000 000001 000001" : Bytes), response := (prim utf8_encode "open" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000000 000000 000001" : Bytes), response := (prim utf8_encode "preview" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000000 000000 000000" : Bytes), response := (prim utf8_encode "none" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000001 000000 000000" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 2 16 900 1 0 320" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000001 00000x" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "skips 000001 000002" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000001_000001" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "play something" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (nil Foundation.View.Text.V1.Model::AcceptanceVector))))))))))))))))))))))))))))))))))))))))))))))))))))))))))), entryRoot := "PrismHoloPlay.App.dispatch", coreContract := "hologram:guest/core-wasm@1", requestMaximum := (64 : UInt32), responseMaximum := (128 : UInt32), guestAllocationMaximum := (256 : UInt32), capabilitiesEmpty := true, fatArchive := true, primaryLayer := (0 : UInt8), viewLayer := (1 : UInt8), view := (record Foundation.View.Text.V1.Model::TextView {title := "Holo Play", heading := "Holo Play", inputLabel := "Request", submitLabel := "Send", outputLabel := "Response", inputError := "Invalid request", responseError := "Invalid response"})})
+}
+\end{semanticmodule}
+\end{lexlean}

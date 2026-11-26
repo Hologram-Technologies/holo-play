@@ -1,0 +1,11 @@
+[application]
+name = "holo-play"
+version = "0.1.0"
+description = "Holo Play: music, radio, podcasts and audiobooks in one player, with its playback decisions proved."
+
+[model]
+source = "app/src"
+watch = ["app/src/**/*.lex.tex", "app/language/**/*.toml", "app/lexlean.toml", "app/view/**", "model/**/*.toml", "features/**/*.feature"]
+
+# Deny by default: an empty set grants the holo nothing.
+[capabilities]

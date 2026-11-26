@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Holo Play</title>
+  <!--
+    Holo Play's page, built from the Prism design system. Every playback decision is the model's
+    (app/src/App.lex.tex): which representation ranks first, what follows a failure, whether an item reaches the
+    audio engine, and where next, previous and remove leave the queue. The page fetches, plays and draws.
+    The build writes prism.css, prism-ui.js and prism.js beside these files.
+  -->
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="prism.css">
+  <script src="prism-ui.js"></script>
+  <script type="module" src="prism.js"></script>
+  <script src="engine.js"></script>
+  <script src="library.js"></script>
+  <script src="subsonic.js"></script>
+  <script src="sources.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <div data-slot="app" class="h-screen">
+    <header data-slot="toolbar">
+      <div data-slot="brand" class="min-w-0">
+        <span data-slot="brand-mark" aria-hidden="true"><span data-slot="icon" data-icon="music"></span></span>
+        <h1 data-slot="brand-name" class="truncate hidden md:block">Holo Play</h1>
+      </div>
+      <div class="flex-1 min-w-0 max-w-xl">
+        <label class="sr-only" for="search">Search songs, artists and albums</label>
+        <div data-slot="input-group">
+          <input data-slot="input-group-control" id="search" type="search" placeholder="Search songs, artists, albums" autocomplete="off" spellcheck="false">
+          <div data-slot="input-group-addon"><span data-slot="icon" data-icon="search" aria-hidden="true"></span></div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button data-slot="button" data-variant="ghost" data-size="sm" type="button" data-open="sound" aria-label="Sound" data-tooltip="Sound"><span data-slot="icon" data-icon="sliders-horizontal" aria-hidden="true"></span><span class="hidden md:inline" id="sound-chip">Hi-Fi</span></button>
+        <button data-slot="button" data-variant="ghost" data-size="icon-sm" type="button" data-open="queue" id="queue-open" aria-label="Queue" data-tooltip="Queue"><span data-slot="icon" data-icon="list" aria-hidden="true"></span></button>
+      </div>
+    </header>
+
+    <main class="flex flex-col flex-1 min-h-0">
+      <nav class="px-6" aria-label="Sections">
+        <div data-slot="scroll-area" class="w-full max-w-6xl mx-auto flex items-center gap-1 pt-3">
+          <button data-slot="button" data-variant="secondary" data-size="sm" type="button" data-tab="home" aria-current="page"><span data-slot="icon" data-icon="music" aria-hidden="true"></span>Music</button>
+          <button data-slot="button" data-variant="ghost" data-size="sm" type="button" data-tab="radio"><span data-slot="icon" data-icon="wifi" aria-hidden="true"></span>Radio</button>
+          <button data-slot="button" data-variant="ghost" data-size="sm" type="button" data-tab="podcasts"><span data-slot="icon" data-icon="mic" aria-hidden="true"></span>Podcasts</button>
+          <button data-slot="button" data-variant="ghost" data-size="sm" type="button" data-tab="books"><span data-slot="icon" data-icon="book-open" aria-hidden="true"></span>Audiobooks</button>
+          <button data-slot="button" data-variant="ghost" data-size="sm" type="button" data-tab="saved"><span data-slot="icon" data-icon="heart" aria-hidden="true"></span>Saved</button>
+        </div>
+      </nav>
+      <div data-slot="scroll-area" class="flex-1" tabindex="0" aria-label="Library" id="page">
+        <div class="w-full max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 gap-10">
+          <div data-slot="alert" data-variant="destructive" role="alert" id="error" hidden>
+            <p data-slot="alert-title" id="error-title">Playback stopped</p>
+            <p data-slot="alert-description" id="error-text"></p>
+            <div class="pt-2"><button data-slot="button" data-variant="outline" data-size="sm" type="button" id="error-close"><span data-slot="icon" data-icon="x" aria-hidden="true"></span>Dismiss</button></div>
+          </div>
+
+          <div id="results" class="grid grid-cols-1 gap-10" hidden>
+            <h2 id="results-title" class="font-display text-2xl font-semibold tracking-tight">Results</h2>
+              <p class="text-sm text-muted-foreground" id="r-link" hidden></p>
+            <section aria-labelledby="r-songs-title" class="grid grid-cols-1 gap-3" id="r-songs-box">
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-songs-title">Songs</h3>
+              <ol data-slot="item-group" class="gap-1 list-none" id="r-songs" aria-label="Songs"></ol>
+            </section>
+            <section aria-labelledby="r-artists-title" class="grid grid-cols-1 gap-3" id="r-artists-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-artists-title">Artists</h3>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="r-artists"></div>
+            </section>
+            <section aria-labelledby="r-albums-title" class="grid grid-cols-1 gap-3" id="r-albums-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-albums-title">Albums and playlists</h3>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="r-albums"></div>
+            </section>
+            <section aria-labelledby="r-sc-title" class="grid grid-cols-1 gap-3" id="r-sc-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-sc-title">SoundCloud</h3>
+              <ol data-slot="item-group" class="gap-1 list-none" id="r-sc" aria-label="SoundCloud tracks"></ol>
+            </section>
+            <section aria-labelledby="r-radio-title" class="grid grid-cols-1 gap-3" id="r-radio-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-radio-title">Radio stations</h3>
+              <ol data-slot="item-group" class="gap-1 list-none" id="r-radio" aria-label="Radio stations"></ol>
+            </section>
+            <section aria-labelledby="r-pods-title" class="grid grid-cols-1 gap-3" id="r-pods-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-pods-title">Podcasts</h3>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="r-pods"></div>
+            </section>
+            <section aria-labelledby="r-books-title" class="grid grid-cols-1 gap-3" id="r-books-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-books-title">Audiobooks</h3>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="r-books"></div>
+            </section>
+            <section aria-labelledby="r-open-title" class="grid grid-cols-1 gap-3" id="r-open-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-open-title">From the catalogue</h3>
+              <ol data-slot="item-group" class="gap-1 list-none" id="r-open" aria-label="Songs from the catalogue"></ol>
+            </section>
+          </div>
+
+          <div id="home" class="grid grid-cols-1 gap-10">
+            <section aria-labelledby="chart-title" class="grid grid-cols-1 gap-4" id="chart-box">
+              <h2 id="chart-title" class="font-display text-2xl font-semibold tracking-tight">Top songs</h2>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="chart" aria-busy="true">
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+              </div>
+            </section>
+
+            <section aria-labelledby="trending-title" class="grid grid-cols-1 gap-4" id="trending-box">
+              <h2 id="trending-title" class="font-display text-2xl font-semibold tracking-tight">Trending now</h2>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="trending" aria-busy="true">
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+              </div>
+            </section>
+
+            <section aria-labelledby="hot-title" class="grid grid-cols-1 gap-4" id="hot-box">
+              <h2 id="hot-title" class="font-display text-2xl font-semibold tracking-tight">Hot playlists</h2>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="hot" aria-busy="true">
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+              </div>
+            </section>
+
+            <section aria-labelledby="bundled-title" class="grid grid-cols-1 gap-4">
+              <h2 id="bundled-title" class="font-display text-2xl font-semibold tracking-tight">Verified originals</h2>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="bundled"></div>
+            </section>
+
+            <section aria-labelledby="concerts-title" class="grid grid-cols-1 gap-4" id="concerts-box">
+              <h2 id="concerts-title" class="font-display text-2xl font-semibold tracking-tight">Lossless concerts</h2>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="concerts" aria-busy="true">
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+              </div>
+              <p class="text-sm text-muted-foreground" id="concerts-note" hidden></p>
+            </section>
+          </div>
+
+          <div id="radio" class="grid grid-cols-1 gap-10" hidden>
+            <section aria-labelledby="radio-head" class="grid grid-cols-1 gap-4">
+              <h2 id="radio-head" class="font-display text-2xl font-semibold tracking-tight">Radio</h2>
+              <div class="flex flex-wrap gap-2" id="themes"></div>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="radio-title">Popular now</h3>
+              <ol data-slot="item-group" class="gap-1 list-none" id="radio-list" aria-label="Stations"></ol>
+            </section>
+            <section aria-labelledby="soma-title" class="grid grid-cols-1 gap-4" id="soma-box">
+              <h2 id="soma-title" class="font-display text-2xl font-semibold tracking-tight">SomaFM channels</h2>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="soma" aria-busy="true">
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+              </div>
+            </section>
+          </div>
+
+          <div id="podcasts" class="grid grid-cols-1 gap-4" hidden>
+            <h2 class="font-display text-2xl font-semibold tracking-tight">Podcasts</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="pod-hot" aria-busy="true">
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+            </div>
+            <p class="text-sm text-muted-foreground" id="pod-hot-note" hidden></p>
+          </div>
+
+          <div id="books" class="grid grid-cols-1 gap-4" hidden>
+            <h2 class="font-display text-2xl font-semibold tracking-tight">Audiobooks</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="books-shelf" aria-busy="true">
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+            </div>
+            <p class="text-sm text-muted-foreground" id="books-shelf-note" hidden></p>
+          </div>
+
+          <div id="saved" class="grid grid-cols-1 gap-4" hidden>
+            <h2 class="font-display text-2xl font-semibold tracking-tight">Saved</h2>
+            <ol data-slot="item-group" class="gap-1 list-none" id="saved-list" aria-label="Saved items"></ol>
+            <section aria-labelledby="lists-title" class="grid grid-cols-1 gap-3" id="lists-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="lists-title">Playlists</h3>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="lists"></div>
+            </section>
+            <section aria-labelledby="recent-title" class="grid grid-cols-1 gap-3" id="recent-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="recent-title">Recently played</h3>
+              <ol data-slot="item-group" class="gap-1 list-none" id="recent" aria-label="Recently played"></ol>
+            </section>
+            <section aria-labelledby="server-title" class="grid grid-cols-1 gap-3">
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="server-title">Your server</h3>
+              <p class="text-sm text-muted-foreground" id="server-line">Play your own Navidrome or Subsonic library.</p>
+              <div><button data-slot="button" data-variant="outline" data-size="sm" type="button" data-open="server">Connect a server</button></div>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="server-albums"></div>
+            </section>
+          </div>
+
+          <section id="album" class="grid grid-cols-1 gap-6" aria-labelledby="album-title" hidden>
+            <div><button data-slot="button" data-variant="ghost" data-size="sm" type="button" id="album-back"><span data-slot="icon" data-icon="arrow-left" aria-hidden="true"></span>Back</button></div>
+            <div class="flex flex-col md:flex-row gap-6 md:items-end">
+              <div class="flex items-center justify-center overflow-hidden size-16 md:w-xs md:h-auto aspect-square rounded-xl bg-muted shrink-0" id="album-cover"></div>
+              <header data-slot="page-header" class="min-w-0">
+                <p data-slot="eyebrow" id="album-kind">Album</p>
+                <h2 id="album-title">Album</h2>
+                <p id="album-line"></p>
+                <div class="flex items-center gap-2 pt-2">
+                  <button data-slot="button" type="button" id="album-play"><span data-slot="icon" data-icon="play" aria-hidden="true"></span>Play</button>
+                  <button data-slot="button" data-variant="outline" type="button" id="album-shuffle"><span data-slot="icon" data-icon="dice-5" aria-hidden="true"></span>Shuffle</button>
+                </div>
+              </header>
+            </div>
+            <div id="album-own" hidden><button data-slot="button" data-variant="outline" data-size="sm" type="button" id="album-delete"><span data-slot="icon" data-icon="trash-2" aria-hidden="true"></span>Delete playlist</button></div>
+            <ol data-slot="item-group" class="gap-1 list-none" id="album-tracks" aria-label="Tracks"></ol>
+            <section aria-labelledby="album-albums-title" class="grid grid-cols-1 gap-3" id="album-albums-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="album-albums-title">Albums</h3>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="album-albums"></div>
+            </section>
+          </section>
+        </div>
+      </div>
+
+      <section class="border-t bg-card px-6 py-3" id="player" aria-label="Player" hidden>
+        <div class="w-full max-w-6xl mx-auto grid gap-2">
+          <div class="flex items-center gap-3">
+            <div class="flex items-center justify-center overflow-hidden size-12 rounded-md bg-muted shrink-0" id="now-cover"></div>
+            <div class="grid min-w-0 flex-1">
+              <p class="font-medium truncate" id="now-title"></p>
+              <p class="text-sm text-muted-foreground truncate" id="now-artist"></p>
+            </div>
+            <div class="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+              <span class="text-success" id="now-verified" hidden><span data-slot="icon" data-icon="shield-check" aria-hidden="true"></span><span class="sr-only">Verified</span></span>
+              <span class="whitespace-nowrap" id="now-quality"></span>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button data-slot="toggle" data-size="sm" type="button" aria-pressed="false" aria-label="Save" data-tooltip="Save" id="fav"><span data-slot="icon" data-icon="heart" aria-hidden="true"></span></button>
+              <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Back 15 seconds" data-tooltip="Back 15 seconds" id="skip-back" hidden><span data-slot="icon" data-icon="rotate-ccw" aria-hidden="true"></span></button>
+              <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Forward 30 seconds" data-tooltip="Forward 30 seconds" id="skip-on" hidden><span data-slot="icon" data-icon="rotate-cw" aria-hidden="true"></span></button>
+              <button data-slot="toggle" data-size="sm" class="hidden md:inline-flex" type="button" aria-pressed="false" aria-label="Shuffle" data-tooltip="Shuffle (S)" id="shuffle"><span data-slot="icon" data-icon="dice-5" aria-hidden="true"></span></button>
+              <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Previous" data-tooltip="Previous (Shift+Left)" id="prev"><span data-slot="icon" data-icon="chevron-left" aria-hidden="true"></span></button>
+              <button data-slot="button" data-variant="brand" data-size="icon" class="rounded-full" type="button" aria-label="Play" data-tooltip="Play or pause (Space)" id="play"><span data-slot="icon" data-icon="play" aria-hidden="true" id="play-icon"></span><span data-slot="icon" data-icon="pause" aria-hidden="true" id="pause-icon" hidden></span></button>
+              <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Next" data-tooltip="Next (Shift+Right)" id="next"><span data-slot="icon" data-icon="chevron-right" aria-hidden="true"></span></button>
+              <button data-slot="toggle" data-size="sm" class="hidden md:inline-flex" type="button" aria-pressed="false" aria-label="Repeat: off" data-tooltip="Repeat (R)" id="repeat"><span data-slot="icon" data-icon="refresh-cw" aria-hidden="true"></span><span class="text-xs" id="repeat-word"></span></button>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-muted-foreground tabular-nums" id="time-now">0:00</span>
+            <input data-slot="slider" class="flex-1" type="range" min="0" max="1000" value="0" aria-label="Seek" id="seek">
+            <span class="text-xs text-muted-foreground tabular-nums" id="time-total">0:00</span>
+            <span data-slot="icon" data-icon="volume-2" aria-hidden="true" class="hidden md:inline-flex text-muted-foreground"></span>
+            <input data-slot="slider" class="hidden md:block w-24" type="range" min="0" max="100" value="100" aria-label="Volume" id="volume">
+          </div>
+          <p class="md:hidden text-xs text-muted-foreground truncate" id="now-line"></p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog data-slot="sheet" data-side="right" id="sound" aria-labelledby="sound-title">
+    <div data-slot="dialog-header">
+      <h2 data-slot="dialog-title" id="sound-title">Sound</h2>
+      <p data-slot="dialog-description">Shapes what is in the recording. Adds nothing that is not there.</p>
+    </div>
+    <div data-slot="field-group" class="py-4">
+      <label data-slot="label" class="flex items-center gap-3"><input data-slot="switch" type="checkbox" role="switch" id="enhance"> Enhance</label>
+      <div data-slot="field">
+        <label data-slot="label" for="preset">Preset</label>
+        <select data-slot="select" id="preset"></select>
+        <p data-slot="field-description" id="preset-note"></p>
+      </div>
+      <fieldset data-slot="field-set">
+        <legend data-slot="field-legend">Equaliser</legend>
+        <div class="grid grid-cols-1 gap-3" id="bands"></div>
+      </fieldset>
+      <label data-slot="label" class="flex items-center gap-3"><input data-slot="switch" type="checkbox" role="switch" id="crossfeed"> Headphone crossfeed</label>
+      <label data-slot="label" class="flex items-center gap-3"><input data-slot="switch" type="checkbox" role="switch" id="spatial"> Speaker stage for headphones</label>
+      <div data-slot="field">
+        <label data-slot="label" for="level">Output level</label>
+        <progress data-slot="progress" id="level" value="0" max="100"></progress>
+        <p data-slot="field-description" id="engine-line">The engine starts with the first track you play.</p>
+      </div>
+      <p class="text-sm text-muted-foreground" id="route-line"></p>
+      <div data-slot="field">
+        <label data-slot="label" for="speed">Speed for podcasts and audiobooks</label>
+        <select data-slot="select" id="speed">
+          <option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option><option value="3">3×</option>
+        </select>
+      </div>
+      <div data-slot="field">
+        <label data-slot="label" for="sleep">Sleep timer</label>
+        <select data-slot="select" id="sleep">
+          <option value="0">Off</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">1 hour</option>
+        </select>
+        <p data-slot="field-description" id="sleep-line"></p>
+      </div>
+    </div>
+    <div data-slot="dialog-footer"><button data-slot="button" data-variant="outline" type="button" data-close>Done</button></div>
+  </dialog>
+
+  <dialog data-slot="sheet" data-side="right" id="queue" aria-labelledby="queue-title">
+    <div data-slot="dialog-header">
+      <h2 data-slot="dialog-title" id="queue-title">Queue</h2>
+      <p data-slot="dialog-description" id="queue-line">Nothing is queued.</p>
+    </div>
+    <ol data-slot="item-group" class="gap-1 list-none py-4 min-w-0 w-full overflow-hidden" id="queue-list" aria-label="Queued tracks"></ol>
+    <form class="grid grid-cols-1 gap-2 pb-4" id="list-form" autocomplete="off">
+      <label data-slot="label" for="list-name">Save the queue as a playlist</label>
+      <div class="flex items-center gap-2">
+        <input data-slot="input" class="flex-1" id="list-name" placeholder="Playlist name">
+        <button data-slot="button" data-variant="outline" type="submit">Save</button>
+      </div>
+    </form>
+    <div data-slot="dialog-footer"><button data-slot="button" data-variant="outline" type="button" data-close>Done</button></div>
+  </dialog>
+  <dialog data-slot="dialog" id="server" aria-labelledby="server-dialog-title">
+    <div data-slot="dialog-header">
+      <h2 data-slot="dialog-title" id="server-dialog-title">Connect a Navidrome or Subsonic server</h2>
+      <p data-slot="dialog-description">The password is used to sign requests in this session. It is not kept.</p>
+    </div>
+    <form id="server-form" autocomplete="off"><div data-slot="field-group" class="py-4">
+      <div data-slot="field"><label data-slot="label" for="server-url">Server address</label><input data-slot="input" id="server-url" type="url" placeholder="https://music.example.com" required></div>
+      <div data-slot="field"><label data-slot="label" for="server-user">Username</label><input data-slot="input" id="server-user" required></div>
+      <div data-slot="field"><label data-slot="label" for="server-pass">Password</label><input data-slot="input" id="server-pass" type="password" required></div>
+      <p data-slot="field-error" id="server-error" role="alert" hidden></p>
+      <div data-slot="dialog-footer"><button data-slot="button" data-variant="outline" type="button" data-close>Cancel</button><button data-slot="button" type="submit">Connect</button></div>
+    </div></form>
+  </dialog>
+</body>
+</html>
