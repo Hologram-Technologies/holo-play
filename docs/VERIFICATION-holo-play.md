@@ -442,3 +442,69 @@ Against a local copy of the published shell release with the two channels added,
 - Gates: `build` and `verify`, 51 theorems, 113 of 113 vectors.
 - Seen in the patched holospace: a chart song in the tall bar, shelves showing blurred through it while scrolling.
 - Not seen: the light theme, a narrow window, the queue and sound sheets over the glass bar.
+
+## Published, and an ambient picture for held songs, 2026-11-26
+
+### Published
+
+- PR #1 merged into `main` (9bda951). The registry and the store rebuild from the default branch on their own.
+- IPFS: the build of that commit, `blake3:1b9906a5…`, is pinned on the owner's own node as
+  `bafybeic5f4nzeixmgrigqqih7uffyqfz7hekdz4u4p3m7bubqmkyf22w5e`. The network names that node as its provider.
+  A fetch through public gateways was refused with 429 (rate limit), so an outside fetch was not confirmed.
+  It is reachable only while that machine and its node are running. The node's control port was moved from 5001 to
+  5002, because 5001 could not be bound on this machine.
+
+### After the merge, not on `main`
+
+- VZ-07 `drift`: a held player's song may show a drifting picture only while it plays and animation is on; it is
+  never drawn as reacting. 54 theorems, 118 of 118 vectors, `verify` passes.
+- The immersive view drifts for a held song and says "ambient, not reading the sound". Seen in the patched
+  holospace: slow coloured lights behind the centred player. The cover was not laid into the picture there.
+- The bar has the animation switch and its own small stage. Seen: the switch. Not seen: any picture on the bar's
+  stage; it may be too faint or not drawing. The last strengthening of the drift lights was not looked at.
+- Chart tiles gain the store's cover as one more place to look. Not looked at after the change.
+- Fixed after the entry above: the bar's stage did not draw because it was held back wherever the system asks
+  for reduced motion; the immersive view never applied that check, so the bar no longer does either. Seen in the
+  patched holospace: coloured light moving behind the bar across two looks six seconds apart, for a held song.
+  Not seen: the bar's picture for a song the engine reads (Audius), and whether reduced-motion listeners should
+  have both pictures off by default, which is an open design question.
+
+## Source tags, 2026-11-26
+
+- Every song row and tile carries a small tag naming its source: Audius, YouTube, Radio, SomaFM, Podcast, Archive,
+  Library, Server, SoundCloud, Preview. A catalogue song says where it will most likely play until it is looked up,
+  then where it does play.
+- Seen in the patched holospace: "YouTube" on the chart tiles and on the rows of a search. Not seen: the other
+  names, the tag changing after a lookup that lands on Audius, and narrow tiles, where the tag shortens the artist.
+- Gates: `build` and `verify`, 54 theorems, 118 of 118 vectors.
+
+## Tags of the listener's own, 2026-11-26
+
+- A plus after the mood chips becomes a box; a word and Enter make a chip, kept on this device (up to twelve), and
+  open its mix at once: what the catalogue and Audius have for those words, a song from each in turn, led by what is
+  trending when the word names a genre Audius knows. A tag is removed from its own page.
+- Seen in the patched holospace: "rainy jazz" typed and entered, a 54-track mix opened with YouTube and Audius
+  songs and a "Remove tag" button, and the chip present on the home view afterwards.
+- Not seen: removing a tag, the twelve-tag limit, a tag with no results, the published holospace (no catalogue
+  there, so a tag's mix is Audius only), and whether the chip survives a reload.
+- Gates: `build` and `verify`, 54 theorems, 118 of 118 vectors.
+
+## More sources, 2026-11-26
+
+Each was first checked to answer a page with no origin (`Origin: null`).
+
+- **SoundCloud and YouTube links.** A new rule, PL-04 `holds`: a pasted YouTube or SoundCloud link plays in a held
+  player only when the holospace holds that service's own player. SoundCloud's own description names the track.
+- **Funkwhale.** Open community libraries; full tracks streamed by the pod, 320k MP3 on the one seen, lossless where
+  a pod has it. One pod is named (`tanukitunes.com`); three others tried did not answer that address. Its songs join
+  Audius under "Plays in full".
+- **Radio Paradise.** Four lossless FLAC streams with a 320k AAC fallback, first on the radio page's curated shelf.
+  The streams answer a sandboxed page, so the engine can read them.
+- Tried and left out: SoundCloud search (its API needs a key that is not ours), Mixcloud (searchable, but plays only
+  in its own widget, which the holospace does not hold), Jamendo (needs a key), Bandcamp and ccMixter (no answer to a
+  sandboxed page), Hype Machine (lists songs, gives no stream).
+- Gates: `build` and `verify`, 57 theorems, 124 of 124 vectors.
+- Seen in the patched holospace: a pasted SoundCloud link playing in SoundCloud's own player in the bar, time
+  moving, named "Begin Again · Ben Böhmer". A tag made earlier was still there after a reload.
+- Not seen (the test pane stopped scrolling): Funkwhale rows in a search, a Funkwhale song playing, the Radio
+  Paradise tiles, a lossless stream playing, a pasted YouTube link.

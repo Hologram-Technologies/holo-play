@@ -153,6 +153,7 @@ function ensureEngine() {
   engine.analyser.connect(split);
   taps = [0, 1].map((channel) => { const node = engine.ctx.createAnalyser(); node.fftSize = 2048; node.smoothingTimeConstant = 0.55; split.connect(node, channel); return node; });
   if (visual) visual.setTaps(taps[0], taps[1]);
+  if (mini) mini.setTaps(taps[0], taps[1]);
   return true;
 }
 
@@ -203,6 +204,7 @@ async function prepare(item) {
   item.reps = chosen ? [chosen] : [];
   item.ranked = false;
   item.unresolved = false;
+  for (const tag of document.querySelectorAll('[data-source-of]')) if (tag.getAttribute('data-source-of') === item.id) tag.textContent = sourceOf(item) || tag.textContent;
   if (answer === 'preview' && !previewSaid) {
     previewSaid = true;
     globalThis.ui.toast('Playing a 30-second preview. Full tracks play where an open source has the song, or in the Hologram host.');
@@ -548,15 +550,30 @@ function picture(source, classes, pixels, icon) {
 }
 
 /** A square tile: an album, artist or show that opens, or a song or channel that plays. */
-function tile(title, line, cover, run, id, icon) {
+// ---- where a song comes from, said on every song. A catalogue song has no file of its own: before it is looked
+// up, the tag names where it will most likely play here; once it has been looked up, where it does play.
+let heldPlayers = [];
+shell.players.then((offered) => { heldPlayers = offered; });
+const SOURCE_NAMES = { funkwhale: 'Funkwhale', audius: 'Audius', radio: 'Radio', soma: 'SomaFM', podcast: 'Podcast', archive: 'Archive', bundled: 'Library', subsonic: 'Server', soundcloud: 'SoundCloud', link: 'Link' };
+function sourceOf(song) {
+  if (SOURCE_NAMES[song.source]) return SOURCE_NAMES[song.source];
+  if (song.source !== 'catalogue' && song.source !== 'chart') return '';
+  const rep = !song.unresolved && song.reps && song.reps[0];
+  if (rep) return rep.held ? 'YouTube' : rep.preview ? 'Preview' : /soundcloud/i.test(rep.label || '') ? 'SoundCloud' : 'Audius';
+  return heldPlayers.includes('youtube') ? 'YouTube' : song.preview ? 'Preview' : 'Catalogue';
+}
+const sourceTag = (song) => { const name = sourceOf(song); return name ? h('span', { slot: 'badge', variant: 'outline', class: 'shrink-0', 'data-source-of': song.id }, name) : null; };
+
+function tile(title, line, cover, run, id, icon, tag) {
   return h('button', { slot: 'item', type: 'button', class: 'flex-col items-stretch gap-3 text-left', 'data-song': id || false, onclick: run },
     picture(cover, 'w-full aspect-square rounded-xl bg-muted shadow-md', 260, icon),
     h('span', { slot: 'item-content', class: 'min-w-0 w-full overflow-hidden' },
       h('span', { slot: 'item-title', class: 'block w-full truncate' }, title),
-      h('span', { slot: 'item-description', class: 'block w-full truncate' }, line)));
+      h('span', { class: 'flex items-center gap-2 min-w-0 w-full' },
+        h('span', { slot: 'item-description', class: 'block min-w-0 flex-1 truncate' }, line), tag || null)));
 }
 const entryTile = (entry) => tile(entry.name, [entry.artist, entry.year].filter(Boolean).join(' · '), entry.cover(260), () => openAlbum(entry), '', iconOf(entry));
-const songTile = (song, list, i) => tile(song.title, song.live ? song.album || song.artist : song.artist, song.cover(260), () => playList(list, i), song.id, iconOf(song));
+const songTile = (song, list, i) => tile(song.title, song.live ? song.album || song.artist : song.artist, song.cover(260), () => playList(list, i), song.id, iconOf(song), sourceTag(song));
 
 function songRow(song, list, i, numbered) {
   return h('li', null,
@@ -568,7 +585,7 @@ function songRow(song, list, i, numbered) {
         h('span', { slot: 'item-title', class: 'block w-full truncate' }, song.title),
         h('span', { slot: 'item-description', class: 'block w-full truncate' }, [song.artist, numbered ? '' : song.album].filter(Boolean).join(' · '))),
       h('span', { slot: 'item-actions', class: 'gap-3 shrink-0' },
-        song.full ? h('span', { slot: 'badge', variant: 'outline', class: 'hidden md:inline-flex' }, 'Full track') : null,
+        sourceTag(song),
         song.live ? h('span', { slot: 'badge', variant: 'outline', class: 'hidden md:inline-flex' }, song.reps[0].label) : null,
         h('span', { class: 'text-sm text-muted-foreground tabular-nums' }, song.live ? 'Live' : song.duration ? clock(song.duration) : ''))));
 }
@@ -592,7 +609,8 @@ async function openAlbum(entry) {
   $('album-line').textContent = [entry.artist, entry.year].filter(Boolean).join(' · ');
   $('album-tracks').replaceChildren(note('Loading'));
   $('album-albums-box').hidden = true;
-  $('album-own').hidden = !entry.own;
+  $('album-own').hidden = !(entry.own || entry.kind === 'Tag');
+  $('album-delete-word').textContent = entry.kind === 'Tag' ? 'Remove tag' : 'Delete playlist';
   drawCover($('album-cover'), entry, 320);
   opened = { entry, songs: [], behind };
   const mine = opened;
@@ -640,7 +658,31 @@ async function openLink(text, mine) {
     return said('That Internet Archive link names no item.');
   }
   if (answer === 'companion' || answer === 'import') { playList([single(companion.stream(text), false)], 0); return said('Playing through the Hologram host.'); }
-  said('This link cannot be played here. YouTube, SoundCloud and other page links play when Holo Play runs in the Hologram host.');
+  // A YouTube or SoundCloud page: its own player, where the holospace holds one (PL-04).
+  if (where === 2 || where === 3) {
+    const offered = await shell.players;
+    const held = await ask('holds', where, offered.includes('youtube') ? 1 : 0, offered.includes('soundcloud') ? 1 : 0);
+    if (mine !== searching) return;
+    if (held === 'held' && where === 3) {
+      const id = ((/[?&]v=([A-Za-z0-9_-]{11})(?:&|$)/.exec(url.search)) || (/^\/(?:embed\/|shorts\/|live\/)?([A-Za-z0-9_-]{11})\/?$/.exec(url.pathname)) || [])[1] || '';
+      if (id && (await askText(`ytids ${id}`)) === 'valid') {
+        const picture = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+        playList([{ id: `link:${id}`, source: 'link', title: 'YouTube video', artist: 'YouTube', album: '', duration: 0, cover: () => Promise.resolve(picture), thumb: picture, kappa: '',
+          reps: [{ held: 'youtube', ref: id, url: '', type: '', lossless: 0, bits: 0, kbps: 0, label: 'YouTube · full track', unreadable: true }] }], 0);
+        return said('Playing in YouTube’s own player.');
+      }
+      return said('That YouTube link names no video.');
+    }
+    if (held === 'held' && where === 2 && host !== 'snd.sc') {
+      let about = { title: name || 'SoundCloud', artist: 'SoundCloud', picture: '' };
+      try { about = await globalThis.HoloSources.soundcloud.about(text); } catch { /* the link still plays without its name */ }
+      if (mine !== searching) return;
+      playList([{ id: `link:${text}`, source: 'soundcloud', title: about.title, artist: about.artist, album: 'SoundCloud', duration: 0, cover: () => Promise.resolve(about.picture), thumb: about.picture, kappa: '',
+        reps: [{ held: 'soundcloud', ref: `https://soundcloud.com${url.pathname}`, url: '', type: '', lossless: 0, bits: 0, kbps: 0, label: 'SoundCloud · full track', unreadable: true }] }], 0);
+      return said('Playing in SoundCloud’s own player.');
+    }
+  }
+  said('This link cannot be played here. YouTube and SoundCloud links play where the holospace holds their players, or in the Hologram host.');
 }
 
 // One query, every source at once; each group draws as its source answers, and a newer query discards an older one.
@@ -673,6 +715,8 @@ function search() {
   const begin = (box) => { if (!fresh.has(box)) { fresh.add(box); $(box).replaceChildren(); } };
   const list = (box) => (songs) => { if (mine !== searching || !songs.length) return; fresh.add(box); rows(box, songs, false); $(`${box}-box`).hidden = false; };
   const tiles = (box) => (found) => { if (mine !== searching || !found.length) return; begin(box); $(box).append(...found.map(entryTile)); $(`${box}-box`).hidden = false; };
+  let openSongs = []; // every source that plays in full, in one list as each answers
+  const addOpen = (songs) => { if (mine !== searching || !songs.length) return; openSongs = [...openSongs, ...songs]; list('r-open')(openSongs); };
   const songsIn = (songs) => {
     if (mine !== searching) return;
     if (songs.length) rows('r-songs', songs, false); else $('r-songs').replaceChildren(note('No songs were found.'));
@@ -694,7 +738,8 @@ function search() {
     }, songsOut('The catalogue could not be reached. Check the connection.'));
   });
   const asked = [named,
-    audius.search(term, 12).then(list('r-open')),
+    audius.search(term, 12).then(addOpen),
+    globalThis.HoloSources.funkwhale.search(term, 10).then(addOpen),
     audius.artists(term, 6).then(tiles('r-artists')),
     audius.playlists(term, 6).then(tiles('r-albums')),
     radio.search(term, 8).then(list('r-radio')),
@@ -758,8 +803,7 @@ function load(view) {
   if (view === 'home') {
     shelf('chart', () => catalogue.chart(12), songTile);
     const { charts, categories } = globalThis.HoloSources;
-    $('moods').replaceChildren(...categories.moods.map((mood) => h('button', { slot: 'button', variant: 'outline', size: 'sm', class: 'rounded-full', type: 'button', onclick: () => openAlbum(mood.entry) },
-      h('span', { slot: 'icon', 'data-icon': mood.icon, 'aria-hidden': 'true' }), mood.name)));
+    drawMoods();
     $('genres').replaceChildren(...categories.genres.map((genre) => h('button', { slot: 'button', variant: 'secondary', size: 'sm', class: 'rounded-full', type: 'button', onclick: () => openAlbum(genre.entry) }, genre.name)));
     chartShelf('trending', charts.trending, songTile);
     chartShelf('world-songs', charts.songs, songTile);
@@ -770,7 +814,7 @@ function load(view) {
   } else if (view === 'radio') {
     $('themes').replaceChildren(...THEMES.map((name) => h('button', { slot: 'button', variant: 'outline', size: 'sm', type: 'button', onclick: () => stations(name, () => radio.byTag(name.toLowerCase(), 40)) }, name)));
     stations('Popular now', () => radio.top(40));
-    shelf('soma', () => soma.channels(), songTile);
+    shelf('soma', async () => [...globalThis.HoloSources.paradise(), ...(await soma.channels().catch(() => []))], songTile);
   } else if (view === 'podcasts') {
     shelf('pod-hot', () => podcasts.hot(18), entryTile, 'The podcast directory could not be reached. Search still tries.');
   } else if (view === 'books') {
@@ -1011,7 +1055,45 @@ addEventListener('keydown', (event) => { if ((event.ctrlKey || event.metaKey) &&
 for (const tab of document.querySelectorAll('[data-tab]')) tab.addEventListener('click', () => { const view = tab.getAttribute('data-tab'); $('search').value = ''; searching += 1; opened = null; show(view); load(view); });
 $('fav').addEventListener('click', () => toggleSaved());
 $('list-form').addEventListener('submit', (event) => { event.preventDefault(); saveQueue(); });
-$('album-delete').addEventListener('click', () => { if (opened && opened.entry.own) { dropList(opened.entry.own); opened = null; show('saved'); } });
+$('album-delete').addEventListener('click', () => {
+  if (opened && opened.entry.kind === 'Tag') { dropTag(opened.entry.name); opened = null; show('home'); return; }
+  if (opened && opened.entry.own) { dropList(opened.entry.own); opened = null; show('saved'); }
+});
+
+// ---- moods, and tags of the listener's own. The plus becomes a box; a word and Enter make a chip, kept on this
+// device, and open its mix at once. A tag is removed from its own page.
+let tags = kept('tags', []).filter((t) => typeof t === 'string').slice(0, 12);
+const tagEntries = new Map();
+const tagEntry = (name) => { if (!tagEntries.has(name)) tagEntries.set(name, globalThis.HoloSources.categories.custom(name)); return tagEntries.get(name); };
+function drawMoods() {
+  const { categories } = globalThis.HoloSources;
+  const chip = (name, icon, entry) => h('button', { slot: 'button', variant: 'outline', size: 'sm', class: 'rounded-full', type: 'button', onclick: () => openAlbum(entry) },
+    h('span', { slot: 'icon', 'data-icon': icon, 'aria-hidden': 'true' }), name);
+  $('moods').replaceChildren(...categories.moods.map((mood) => chip(mood.name, mood.icon, mood.entry)), ...tags.map((name) => chip(name, 'hash', tagEntry(name))));
+  $('tag-add').hidden = tags.length >= 12;
+}
+function dropTag(name) {
+  tags = tags.filter((t) => t !== name);
+  tagEntries.delete(name);
+  keep('tags', tags);
+  drawMoods();
+}
+function endTag(add) {
+  const name = $('tag-name').value.replace(/\s+/g, ' ').trim().slice(0, 24);
+  $('tag-name').value = '';
+  $('tag-name').hidden = true;
+  $('tag-add').hidden = tags.length >= 12;
+  if (!add || !name) return;
+  const had = tags.find((t) => t.toLowerCase() === name.toLowerCase());
+  if (!had) { tags = [...tags, name].slice(0, 12); keep('tags', tags); drawMoods(); }
+  openAlbum(tagEntry(had || name));
+}
+$('tag-add').addEventListener('click', () => { $('tag-add').hidden = true; $('tag-name').hidden = false; $('tag-name').focus(); });
+$('tag-name').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') { event.preventDefault(); endTag(true); }
+  else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); endTag(false); }
+});
+$('tag-name').addEventListener('blur', () => endTag(false));
 $('server-form').addEventListener('submit', (event) => { event.preventDefault(); connect(); });
 $('skip-back').addEventListener('click', () => { audio.currentTime = Math.max(0, audio.currentTime - 15); });
 $('skip-on').addEventListener('click', () => { audio.currentTime = audio.currentTime + 30; });
@@ -1105,12 +1187,12 @@ function drawNow() {
   $('now-big-title').textContent = current.title;
   $('now-big-artist').textContent = nowLine || [current.artist, current.album].filter(Boolean).join(' · ');
   const sound = current.reps.length ? `${rep.label} · ${routed === 'engine' ? `Engine · ${preset}` : 'Direct'}` : rep.label;
-  $('now-big-line').textContent = motion && showing !== 'still' && drawn ? `${sound} · drawn at ${drawn}` : sound;
-  const quiet = !motion || showing === 'still';
+  $('now-big-line').textContent = drifting ? `${sound} · ambient, not reading the sound` : motion && showing !== 'still' && drawn ? `${sound} · drawn at ${drawn}` : sound;
+  const quiet = !motion || (showing === 'still' && !drifting);
   $('stage').hidden = quiet;
-  $('now-still').hidden = !quiet;
-  $('now-space').hidden = quiet;
-  $('now-why').hidden = !motion || remote.active; // the reason is given only when the app, not the listener, holds the picture back
+  $('now-still').hidden = !(quiet || drifting); // the cover, or the held player in its place
+  $('now-space').hidden = quiet || drifting;
+  $('now-why').hidden = !motion || remote.active || drifting; // the reason is given only when the app, not the listener, holds the picture back
   $('now-lock').hidden = !motion;
   $('now-motion').setAttribute('aria-pressed', String(motion));
   $('now-motion').setAttribute('data-state', motion ? 'on' : 'off');
@@ -1118,17 +1200,22 @@ function drawNow() {
   $('motion-on').hidden = !motion;
   $('motion-off').hidden = motion;
   if (quiet) drawCover($('now-art'), current, 600);
-  $('now-aura').hidden = !quiet;
+  $('now-aura').hidden = !quiet || drifting;
   if (quiet && $('now-aura').dataset.of !== current.id) { $('now-aura').dataset.of = current.id; aura(current); }
   placeRemote();
 }
 
 /** Once a second: may the picture react, how hard, and at what detail. */
+let drifting = false;
 async function watch() {
   if ($('now').hidden || !visual || !motion) return;
   const seen = visual.stats();
   const answer = await ask('shows', routed === 'engine' ? 1 : 0, seen.live ? 1 : 0, current && !audio.paused ? 1 : 0);
-  if (answer !== showing) { showing = answer; visual.setMode(showing); drawNow(); }
+  if (answer !== showing) { showing = answer; drifting = false; visual.setMode(showing); drawNow(); }
+  // A held player's song cannot be read, so it is never drawn as sound. The model may still let the picture
+  // drift (VZ-07): it moves, and it says it is not reading the sound.
+  const drift = showing === 'still' && remote.active && (await ask('drift', 1, audio.paused ? 0 : 1, motion ? 1 : 0)) === 'drift';
+  if (drift !== drifting) { drifting = drift; visual.setMode(drift ? 'drift' : showing); drawNow(); }
   detailStep = numberOf(await ask('depth', detailStep, seen.millis));
   visual.setStep(detailStep);
   const size = `${seen.width} × ${seen.height}`;
@@ -1199,10 +1286,47 @@ $('now-motion').addEventListener('click', () => {
   motion = !motion;
   keep('motion', motion);
   if (visual) { if (motion) { showing = 'still'; visual.setMode('still'); visual.start(); } else visual.stop(); }
+  drifting = false;
   drawNow();
   stir();
   if (motion) watch();
+  miniWatch();
 });
+$('bar-motion').addEventListener('click', () => $('now-motion').click());
+
+// ---- the bar's own picture, while the immersive view is closed. The same engine on a small stage behind the bar,
+// under the same rules: it reacts only to sound the engine reads (VZ-01), and for a held player's song it may only
+// drift (VZ-07). The eye in the bar is the same switch as the eye in the immersive view.
+let mini = null;
+let miniOn = false;
+async function miniWatch() {
+  $('bar-motion').setAttribute('aria-pressed', String(motion));
+  $('bar-motion').setAttribute('data-state', motion ? 'on' : 'off');
+  $('bar-motion').setAttribute('aria-label', motion ? 'Animation: on' : 'Animation: off');
+  const wanted = motion && current && !audio.paused && $('now').hidden;
+  let mode = 'still';
+  if (wanted) {
+    if (!mini && globalThis.HoloVisuals) {
+      mini = globalThis.HoloVisuals.create($('bar-stage'));
+      if (mini && taps) mini.setTaps(taps[0], taps[1]);
+    }
+    if (mini) {
+      if (remote.active) mode = (await ask('drift', 1, 1, 1)) === 'drift' ? 'drift' : 'still';
+      else mode = await ask('shows', routed === 'engine' ? 1 : 0, mini.stats().live ? 1 : 0, 1);
+      if (!remote.active && mode === 'still' && routed === 'engine' && !miniOn) mode = 'rest'; // not started yet, so no samples seen yet
+    }
+  }
+  const on = Boolean(mini) && mode !== 'still';
+  $('bar-stage').hidden = !on;
+  if (!mini) return;
+  if (on) {
+    mini.setMode(mode); mini.setStep(0);
+    if (miniFor !== current.id) { miniFor = current.id; firstAddress(await current.cover(320)).then((p) => mini.setTrack(current.id, String(p || '').replace(/^big:/, ''))).catch(() => {}); }
+    if (!miniOn) { mini.start(); miniOn = true; }
+  } else if (miniOn) { mini.stop(); miniOn = false; }
+}
+let miniFor = '';
+setInterval(miniWatch, 1000);
 $('now-lock').addEventListener('click', () => {
   sceneLocked = !sceneLocked;
   $('now-lock').setAttribute('aria-pressed', String(sceneLocked));

@@ -281,6 +281,46 @@
     },
   };
 
+  // ---- Funkwhale: open music libraries run by their own communities. A pod answers a sandboxed page, lists what it
+  // may play to anyone, and streams the file itself, often at 320k and sometimes lossless. Each pod named here was
+  // seen to answer a page with no origin.
+  const PODS = ['tanukitunes.com'];
+  const fwSong = (pod) => (t) => {
+    const up = (t.uploads || [])[0] || {};
+    const flac = /flac|wav|aiff/i.test(`${up.mimetype} ${up.extension}`);
+    const rate = Math.round((up.bitrate || 0) / 1000);
+    const urls = (((t.album || {}).cover || t.cover || {}).urls) || {};
+    const name = (t.artist && t.artist.name) || (((t.artist_credit || [])[0] || {}).credit) || (((t.artist_credit || [])[0] || {}).artist || {}).name || '';
+    return {
+      id: `fw:${pod}:${t.id}`, source: 'funkwhale', title: t.title, artist: name, album: (t.album && t.album.title) || '', duration: up.duration || 0, genre: '',
+      cover: (pixels) => Promise.resolve((pixels > 300 ? urls.large_square_crop || urls.original : urls.medium_square_crop || urls.original) || ''), thumb: urls.medium_square_crop || urls.original || '', kappa: '', full: true,
+      reps: [{ url: `https://${pod}${up.listen_url || t.listen_url}`, type: up.mimetype || 'audio/mpeg', lossless: flac ? 2 : 1, bits: flac ? 16 : 0, kbps: rate,
+        label: flac ? 'FLAC · lossless' : `${String(up.extension || 'mp3').toUpperCase()}${rate ? ` ${rate}k` : ''} · full track` }],
+    };
+  };
+  const funkwhale = {
+    async search(term, limit = 10) {
+      const lists = await Promise.all(PODS.map((pod) => json(`https://${pod}/api/v1/tracks/?q=${encodeURIComponent(term)}&playable=true&page_size=${limit}`)
+        .then((d) => (d.results || []).filter((t) => t.is_playable !== false && (t.uploads || []).length).map(fwSong(pod))).catch(() => [])));
+      return lists.flat().slice(0, limit);
+    },
+  };
+
+  // ---- Radio Paradise: listener-supported radio, streamed lossless. Its streams answer a sandboxed page, so the
+  // engine can read them. The lossless stream is ranked first, and the 320k one is there if it will not play.
+  const RP = [['flac', 'Main Mix', 'Eclectic'], ['mellow-flac', 'Mellow Mix', 'Mellow'], ['rock-flac', 'Rock Mix', 'Rock'], ['global-flac', 'Global Mix', 'World']];
+  const paradise = () => RP.map(([path, name, kind]) => ({
+    id: `rp:${path}`, source: 'radio', title: `Radio Paradise · ${name}`, artist: 'Radio Paradise', album: `${kind} · lossless`, duration: 0, live: true,
+    cover: () => Promise.resolve('https://radioparadise.com/apple-touch-icon.png'), thumb: 'https://radioparadise.com/apple-touch-icon.png', kappa: '',
+    reps: [{ url: `https://stream.radioparadise.com/${path}`, type: 'audio/ogg', lossless: 2, bits: 16, kbps: 900, label: 'FLAC · lossless' },
+      { url: 'https://stream.radioparadise.com/aac-320', type: 'audio/aac', lossless: 1, bits: 0, kbps: 320, label: 'AAC 320k' }],
+  }));
+
+  // ---- SoundCloud: what a pasted link names, from SoundCloud's own description of it. Playing is the held player's.
+  const soundcloud = {
+    about: async (url) => { const d = await json(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(url)}`); return { title: String(d.title || '').replace(/ by .*$/, ''), artist: d.author_name || 'SoundCloud', picture: d.thumbnail_url || '' }; },
+  };
+
   // ---- podcasts: the fyyd directory answers a sandboxed page and lists each show's episodes itself, so no feed has
   // to be read across origins. (Holo Music uses iTunes for this, which does not answer here.)
   const FY = 'https://api.fyyd.de/0.2';
@@ -355,10 +395,30 @@
   const artistPicture = (artistId, pixels) => () => (artistId ? lookup(`artist:${artistId}`, `artist-mb.php?i=${artistId}`, (d) => ((d.artists || [])[0] || {}).strArtistThumb).then((url) => fitted(url, pixels)) : Promise.resolve(''));
   const leadName = (artist) => String(artist || '').split(/,| feat\.? | ft\.? | & | x | with /i)[0].trim();
   const namedPicture = (artist, pixels) => () => { const name = leadName(artist); return name ? lookup(`name:${name.toLowerCase()}`, `search.php?s=${encodeURIComponent(name)}`, (d) => ((d.artists || [])[0] || {}).strArtistThumb).then((url) => fitted(url, pixels)) : Promise.resolve(''); };
+  // The store's own cover for a song or an album, where the holospace reads the catalogue for the page. One at a
+  // time, so a shelf of tiles does not ask for more reads at once than the holospace allows.
+  let storeTurn = Promise.resolve();
+  const storePicture = (r, pixels) => () => {
+    const made = storeTurn.then(async () => {
+      if (!(await offered).length || !(r.title || r.album)) return '';
+      const key = `store:${leadName(r.artist).toLowerCase()}|${String(r.title || r.album).toLowerCase()}`;
+      if (pictures1[key]) return art(pictures1[key], pixels > 300 ? 1000 : 600);
+      try {
+        const term = encodeURIComponent(`${leadName(r.artist)} ${r.title || r.album}`.trim());
+        const found = (await it(`${IT}/search?media=music&entity=song&limit=1&term=${term}`)).results[0];
+        if (!found || !found.artworkUrl100) return '';
+        remember(key, found.artworkUrl100);
+        return art(found.artworkUrl100, pixels > 300 ? 1000 : 600);
+      } catch { return ''; }
+    });
+    storeTurn = made.catch(() => {});
+    return made;
+  };
   /** A chart entry's picture: each place to look, in order. The page tries them in turn. */
   const coverOf = (r) => (pixels) => Promise.resolve([
     !archiveDown && r.release ? `https://coverartarchive.org/release/${r.release}/front-${pixels > 300 ? 500 : 250}` : '',
     albumPicture(r.group, pixels),
+    storePicture(r, pixels),
     artistPicture(r.artistId, pixels),
     namedPicture(r.artist, pixels),
   ].filter(Boolean));
@@ -474,10 +534,10 @@
   ];
   const GENRES = ['Pop', 'Hip-Hop/Rap', 'Rock', 'Electronic', 'House', 'Techno', 'R&B/Soul', 'Alternative', 'Lo-Fi', 'Ambient', 'Jazz', 'Latin', 'Country', 'Classical', 'Reggae', 'Drum & Bass', 'Dubstep', 'Folk'];
   const ofGenre = (genre, limit) => tracks(`/tracks/trending?genre=${encodeURIComponent(genre)}&time=week&limit=${limit}`);
-  function category(name, kind, load) {
+  function category(name, kind, load, line = 'Trending this week') {
     let found = null;
     const songs = () => (found = found || load().catch((error) => { found = null; throw error; }));
-    return { id: `mix:${name}`, source: 'audius', kind, name, artist: 'Trending this week', year: null, genre: '',
+    return { id: `mix:${kind}:${name}`, source: 'audius', kind, name, artist: line, year: null, genre: '',
       cover: (pixels) => songs().then((list) => (list[0] ? list[0].cover(pixels) : '')).catch(() => ''), songs };
   }
   const categories = {
@@ -489,7 +549,21 @@
       return mixed;
     }) })),
     genres: GENRES.map((name) => ({ name, entry: category(name, 'Genre', () => ofGenre(name, 40)) })),
+    /** A tag of the listener's own: any words. Its mix is what the catalogue and Audius have for those words, a
+     *  song from each in turn. Where the words name a genre Audius knows, what is trending in it leads. */
+    custom: (name) => category(name, 'Tag', async () => {
+      const genre = GENRES.find((g) => g.toLowerCase() === name.trim().toLowerCase());
+      const [trending, named, open] = await Promise.all([
+        genre ? ofGenre(genre, 20).catch(() => []) : [],
+        offered.then((list) => (list.length ? catalogue.songs(name, 30) : [])).catch(() => []),
+        tracks(`/tracks/search?query=${encodeURIComponent(name)}&limit=30`).catch(() => []),
+      ]);
+      const mixed = [...trending];
+      for (let i = 0; i < 30; i++) for (const list of [named, open]) if (list[i]) mixed.push(list[i]);
+      if (!mixed.length) throw new Error('nothing found');
+      return mixed;
+    }, 'Your tag'),
   };
 
-  globalThis.HoloSources = { catalogue, audius, companion, preview, radio, soma, podcasts, big, charts, missed, categories, world, shell, video };
+  globalThis.HoloSources = { catalogue, audius, companion, preview, radio, soma, podcasts, big, charts, missed, categories, world, shell, video, funkwhale, paradise, soundcloud };
 })();
