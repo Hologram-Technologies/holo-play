@@ -7,7 +7,9 @@
 //   ahead <index> <length> <repeat> <auto>             -> play <n> | replay | stop next, and the end of a track
 //   prior <index> <seconds>                            -> play <n> | restart       previous
 //   strip <index> <length> <at>                        -> play <n> | keep <n> | empty   remove from the queue
-//   picks <companion> <open> <preview>                 -> companion | open | preview | none   where a song plays from
+//   plays <companion> <open> <player> <preview>        -> companion | open | player | preview | none   where a song plays from
+//   ytids <eleven characters>                          -> valid | not an identifier   a YouTube identifier, before it is asked for
+//   place <wide> <tall> <left> <top> <frameWide> <frameTall> -> show | too small | outside   where a held player may sit
 //   seeks <position> <seconds>                         -> resume | finished | restart         a saved position
 //   links <extension> <host> <companion>               -> track | stream | album | companion | import | external
 //   offer <kind> <companion>                           -> offer | hide                        a companion source
@@ -31,6 +33,12 @@ function ask(verb, ...numbers) {
   asking = run.catch(() => {});
   return run;
 }
+/** A request that is words, not numbers: the model reads it as it is. */
+function askText(text) {
+  const run = asking.then(() => invoke(text));
+  asking = run.catch(() => {});
+  return run;
+}
 const numberOf = (answer) => Number(answer.slice(answer.indexOf(' ') + 1));
 
 // ---- what the page remembers between visits: settings only, never a rule
@@ -50,6 +58,36 @@ const direct = new Audio();
 const enhanced = new Audio();
 direct.preload = enhanced.preload = 'metadata';
 let audio = direct;
+
+// ---- a song played by YouTube's or SoundCloud's own player. The holospace holds the player and lays it over the
+// dock; this page only asks (play, pause, seek) and is told its state. It wears the face of an audio element, so
+// the transport, the queue and the keys work as they do for a stream. Nothing here can read its sound, so the
+// engine and the visual stay out of it (the model's shows answers still).
+const shell = globalThis.HoloSources.shell;
+const remote = Object.assign(new EventTarget(), { paused: true, duration: 0, error: null, active: false, position: 0, getAttribute: () => 'held', removeAttribute() {}, load() {}, playbackRate: 1 });
+Object.defineProperty(remote, 'currentTime', { get: () => remote.position, set: (v) => { remote.position = Math.max(0, Number(v) || 0); if (remote.active) shell.player('seek', { seconds: remote.position }).catch(() => {}); } });
+Object.defineProperty(remote, 'volume', { get: () => volume / 100, set: (v) => { if (remote.active) shell.player('volume', { level: Math.round(v * 100) }).catch(() => {}); } });
+remote.play = () => (remote.active ? shell.player('play') : Promise.resolve());
+remote.pause = () => { if (remote.active) shell.player('pause').catch(() => {}); };
+const dockPlace = () => { const box = $('dock').getBoundingClientRect(); return { left: Math.round(box.left), top: Math.round(box.top), wide: Math.round(box.width), tall: Math.round(box.height) }; };
+function closeRemote() {
+  if (!remote.active) return;
+  remote.active = false; remote.paused = true; remote.position = 0; remote.duration = 0; remote.error = null;
+  $('dock').hidden = true;
+  shell.player('close').catch(() => {});
+}
+shell.hear((told) => {
+  if (!remote.active || audio !== remote) return;
+  if (Number.isFinite(told.position)) remote.position = told.position;
+  if (Number.isFinite(told.duration) && told.duration > 0) remote.duration = told.duration;
+  if (told.state === 'ready') { remote.volume = volume / 100; shell.player('play').catch(() => {}); }
+  else if (told.state === 'playing') { remote.paused = false; remote.dispatchEvent(new Event('play')); }
+  else if (told.state === 'paused') { remote.paused = true; remote.dispatchEvent(new Event('pause')); }
+  else if (told.state === 'ended') { remote.paused = true; remote.dispatchEvent(new Event('ended')); }
+  else if (told.state === 'error') { remote.error = true; remote.dispatchEvent(new Event('error')); }
+  remote.dispatchEvent(new Event('timeupdate'));
+});
+addEventListener('resize', () => { if (remote.active) shell.player('place', { place: dockPlace() }).catch(() => {}); });
 
 let queue = [];
 let at = -1;                 // the playing index, as the model last answered it
@@ -127,10 +165,17 @@ async function prepare(item) {
   if (!item.unresolved) return;
   const sources = globalThis.HoloSources;
   await sources.companion.probe();
-  const [host, open] = await Promise.all([sources.companion.match(item), sources.audius.match(item)]);
+  // The third place is YouTube's own player, held by the holospace. It is looked for only where one is offered, and
+  // alongside the others, so the wait is the slowest of them and not their sum. The model checks the identifier
+  // (PL-02) and then says which source plays (PL-01).
+  const offered = await shell.players;
+  const [host, open, found] = await Promise.all([sources.companion.match(item), sources.audius.match(item),
+    offered.includes('youtube') ? sources.video(item).catch(() => '') : '']);
   const sample = sources.preview(item);
-  const answer = await ask('picks', host ? 1 : 0, open ? 1 : 0, sample ? 1 : 0);
-  const chosen = { companion: host, open, preview: sample }[answer];
+  const id = found && (await askText(`ytids ${found}`)) === 'valid' ? found : '';
+  const answer = await ask('plays', host ? 1 : 0, open ? 1 : 0, id ? 1 : 0, sample ? 1 : 0);
+  const player = id ? { held: 'youtube', ref: id, url: '', type: '', lossless: 0, bits: 0, kbps: 0, label: 'YouTube · full track', unreadable: true } : null;
+  const chosen = { companion: host, open, player, preview: sample }[answer];
   item.reps = chosen ? [chosen] : [];
   item.ranked = false;
   item.unresolved = false;
@@ -141,6 +186,7 @@ async function prepare(item) {
 }
 
 function silence() {
+  closeRemote();
   for (const el of [direct, enhanced]) { el.pause(); el.removeAttribute('src'); el.load(); }
   if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = ''; }
 }
@@ -179,6 +225,24 @@ async function attempt(mine) {
   let readable = rep.unreadable ? 0 : 1;
   silence();
   draw();
+  if (rep.held) {
+    // The holospace's player. The model says whether the dock is a place a player may be shown (PL-03).
+    $('dock').hidden = false;
+    const place = dockPlace();
+    const fits = await ask('place', place.wide, place.tall, place.left, place.top, globalThis.innerWidth, globalThis.innerHeight);
+    if (mine !== turn) return;
+    if (fits !== 'show') { $('dock').hidden = true; fail('The player does not fit', 'This window is too small to show the player. Make it larger and play the song again.'); return; }
+    routed = 'direct';
+    audio = remote;
+    remote.active = true; remote.paused = true; remote.position = 0; remote.duration = item.duration || 0; remote.error = null;
+    try { await shell.player('load', { provider: rep.held, ref: rep.ref, place }); }
+    catch { if (mine === turn) { closeRemote(); await failed(mine); } return; }
+    draw();
+    session();
+    remember(item);
+    faceOf(item);
+    return;
+  }
   if (item.kappa) {
     // A content-addressed track: fetch the bytes, re-derive their address, and play only what matched.
     let bytes;
@@ -285,8 +349,16 @@ function shuffled(list) {
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
-function playList(songs, index) {
+async function playList(songs, index) {
   if (!songs.length) return;
+  // A catalogue song is looked up before anything is stopped: one that no source has leaves the music playing.
+  const chosen1 = songs[index];
+  if (chosen1 && chosen1.unresolved && (chosen1.source === 'chart' || chosen1.source === 'catalogue') && current) {
+    try { await prepare(chosen1); } catch { return; }
+    if (!chosen1.reps.length && chosen1.source === 'catalogue') { chosen1.unresolved = true; globalThis.ui.toast(`No source can play “${chosen1.title}” here.`); return; }
+    if (!chosen1.reps.length && !$('search').value.trim()) chosen1.unresolved = true;
+    else if (!chosen1.reps.length) { chosen1.unresolved = true; globalThis.ui.toast(`No source can play “${chosen1.title}” in full here yet.`); return; }
+  }
   if (shuffle) { const chosen = songs[index]; queue = [chosen, ...shuffled(songs.filter((s) => s !== chosen))]; return start(0); }
   queue = songs.slice();
   return start(index);
@@ -370,15 +442,28 @@ async function fill(holder, source, pixels, icon) {
     return;
   }
   // One address or several: each is tried in turn, and the picture replaces the icon only once it has loaded.
-  const attempt = (addresses) => {
+  const attempt = async (addresses) => {
     if (holder.filling !== mine) return;
     if (!addresses.length) return blank();
+    const [first, ...rest] = addresses;
+    let address = first;
+    if (typeof first === 'function') { try { address = await first(); } catch { address = ''; } } // a place that must be looked up first
+    if (holder.filling !== mine) return;
+    if (!address) return attempt(rest);
     const img = h('img', { class: 'block w-full h-full object-cover', alt: '', decoding: 'async',
       onload: () => { if (holder.filling === mine) holder.replaceChildren(img); },
-      onerror: () => attempt(addresses.slice(1)) });
-    img.src = addresses[0];
+      onerror: () => { globalThis.HoloSources.missed(address); attempt(rest); } });
+    img.src = address;
   };
   attempt(Array.isArray(src) ? src : [src]);
+}
+/** One address out of what a cover gave: a plain one if there is one, else the first that a lookup answers. */
+async function firstAddress(found) {
+  for (const place of Array.isArray(found) ? found : [found]) {
+    const address = typeof place === 'function' ? await place().catch(() => '') : place;
+    if (address) return address;
+  }
+  return '';
 }
 const drawCover = (holder, item, pixels) => fill(holder, item ? item.cover(pixels) : '', pixels, iconOf(item));
 
@@ -540,7 +625,7 @@ function search() {
   const mine = ++searching;
   opened = null;
   if (!term) { show(section); return; }
-  const { catalogue, audius, radio, podcasts, companion } = globalThis.HoloSources;
+  const { audius, radio, podcasts, companion } = globalThis.HoloSources;
   show('results');
   $('results-title').textContent = term.length > 60 ? `${term.slice(0, 60)}…` : `“${term}”`;
   for (const id of RESULT_BOXES) { $(id).replaceChildren(); $(`${id}-box`).hidden = true; }
@@ -550,18 +635,36 @@ function search() {
   $('r-songs').replaceChildren(note('Searching'));
   const list = (box) => (songs) => { if (mine !== searching || !songs.length) return; rows(box, songs, false); $(`${box}-box`).hidden = false; };
   const tiles = (box) => (found) => { if (mine !== searching || !found.length) return; $(box).append(...found.map(entryTile)); $(`${box}-box`).hidden = false; };
-  audius.search(term, 20).then((songs) => {
+  // The catalogue names every song, artist and album. Where the holospace reads iTunes for the page, that is the
+  // catalogue: one quick answer with covers. Where it does not, MusicBrainz is, more slowly.
+  shell.players.then((offered) => {
     if (mine !== searching) return;
-    if (songs.length) rows('r-songs', songs, false); else $('r-songs').replaceChildren(note('No full tracks were found for that.'));
-  }).catch(() => { if (mine === searching) $('r-songs').replaceChildren(note('The search could not be reached. Check the connection.')); });
+    if (offered.length) {
+      const { catalogue } = globalThis.HoloSources;
+      catalogue.songs(term, 24).then((songs) => {
+        if (mine !== searching) return;
+        if (songs.length) rows('r-songs', songs, false); else $('r-songs').replaceChildren(note('No songs were found.'));
+      }).catch(() => { if (mine === searching) $('r-songs').replaceChildren(note('The catalogue could not be reached. Check the connection.')); });
+      catalogue.artists(term, 6).then(tiles('r-artists')).catch(() => {});
+      catalogue.albums(term, 12).then(tiles('r-albums')).catch(() => {});
+      return;
+    }
+    globalThis.HoloSources.world.search(term).then((found) => {
+      if (mine !== searching) return;
+      tiles('r-artists')(found.artists);
+      found.songs.then((songs) => {
+        if (mine !== searching) return;
+        if (songs.length) rows('r-songs', songs, false); else $('r-songs').replaceChildren(note('No songs were found.'));
+      }).catch(() => { if (mine === searching) $('r-songs').replaceChildren(note('The catalogue is busy. Try again in a moment.')); });
+      found.albums.then(tiles('r-albums')).catch(() => {});
+    }).catch(() => { if (mine === searching) $('r-songs').replaceChildren(note('The catalogue could not be reached. Check the connection.')); });
+  });
+  audius.search(term, 12).then(list('r-open')).catch(() => {});
   audius.artists(term, 6).then(tiles('r-artists')).catch(() => {});
   audius.playlists(term, 6).then(tiles('r-albums')).catch(() => {});
   radio.search(term, 8).then(list('r-radio')).catch(() => {});
   podcasts.search(term, 6).then(tiles('r-pods')).catch(() => {});
   globalThis.HoloLibrary.books(term, 6).then(tiles('r-books')).catch(() => {});
-  catalogue.songs(term, 12).then(list('r-open')).catch(() => {});
-  catalogue.artists(term, 6).then(tiles('r-artists')).catch(() => {});
-  catalogue.albums(term, 6).then(tiles('r-albums')).catch(() => {});
   // SoundCloud is a companion source: the model says whether it is offered at all.
   companion.probe().then(() => ask('offer', 1, companion.present() ? 1 : 0)).then((answer) => (answer === 'offer' ? companion.search(term, 12) : [])).then(list('r-sc')).catch(() => {});
 }
@@ -571,6 +674,7 @@ function lookFor(item) {
   queue = []; at = -1; current = null; turn += 1;
   silence();
   draw();
+  if ($('search').value.trim()) { globalThis.ui.toast(`No source can play “${item.title}” in full here yet.`); return; } // already among search results
   globalThis.ui.toast(`No full source has “${item.title}” here. Showing what can be played.`);
   $('search').value = `${item.artist} ${item.title}`;
   search();
@@ -612,7 +716,10 @@ function load(view) {
   const { catalogue, audius, radio, soma, podcasts } = globalThis.HoloSources;
   if (view === 'home') {
     shelf('chart', () => catalogue.chart(12), songTile);
-    const { charts } = globalThis.HoloSources;
+    const { charts, categories } = globalThis.HoloSources;
+    $('moods').replaceChildren(...categories.moods.map((mood) => h('button', { slot: 'button', variant: 'outline', size: 'sm', class: 'rounded-full', type: 'button', onclick: () => openAlbum(mood.entry) },
+      h('span', { slot: 'icon', 'data-icon': mood.icon, 'aria-hidden': 'true' }), mood.name)));
+    $('genres').replaceChildren(...categories.genres.map((genre) => h('button', { slot: 'button', variant: 'secondary', size: 'sm', class: 'rounded-full', type: 'button', onclick: () => openAlbum(genre.entry) }, genre.name)));
     chartShelf('trending', charts.trending, songTile);
     chartShelf('world-songs', charts.songs, songTile);
     chartShelf('world-albums', charts.albums, entryTile);
@@ -649,7 +756,7 @@ let recent = kept('recent', []);  // [record], newest first
 const record = async (item) => ({
   id: item.id, source: item.source, title: item.title, artist: item.artist, album: item.album, duration: item.duration, thumb: item.thumb || '',
   // A redrawn picture is a blob that does not outlive the page, so its original address is what is kept.
-  art: item.art || await item.cover(600).then((found) => { const url = Array.isArray(found) ? found[0] : found; return url && !url.startsWith('blob:') ? url.replace(/^big:/, '') : ''; }).catch(() => ''),
+  art: item.art || await item.cover(600).then(firstAddress).then((url) => (url && !url.startsWith('blob:') ? url.replace(/^big:/, '') : '')).catch(() => ''),
   thumb: Array.isArray(item.thumb) ? item.thumb[0] || '' : item.thumb || '',
   kappa: item.kappa || '', live: Boolean(item.live), resumable: Boolean(item.resumable), full: Boolean(item.full), station: item.station || '', channel: item.channel || '',
   preview: item.preview || '', unresolved: Boolean(item.unresolved),
@@ -793,8 +900,7 @@ function meter() {
 // ---- the lock screen and hardware keys
 function session() {
   if (!('mediaSession' in navigator) || !current) return;
-  current.cover(512).then((found) => {
-    const art = Array.isArray(found) ? found[0] : found;
+  current.cover(512).then(firstAddress).then((art) => {
     navigator.mediaSession.metadata = new MediaMetadata({ title: current.title, artist: current.artist, album: current.album, artwork: art && !art.startsWith('blob:') ? [{ src: art.replace(/^big:/, '') }] : [] });
   });
   const on = (action, run) => { try { navigator.mediaSession.setActionHandler(action, run); } catch { /* not every browser has every action */ } };
@@ -806,7 +912,7 @@ function session() {
 }
 
 // ---- wiring
-for (const el of [direct, enhanced]) {
+for (const el of [direct, enhanced, remote]) {
   el.addEventListener('play', () => { if (el === audio) drawTransport(); });
   el.addEventListener('pause', () => { if (el === audio) drawTransport(); });
   el.addEventListener('ended', () => {
@@ -842,11 +948,11 @@ $('seek').addEventListener('change', () => {
   $('seek').blur();
 });
 $('volume').value = String(volume);
-$('volume').addEventListener('input', () => { volume = Number($('volume').value); direct.volume = enhanced.volume = volume / 100; keep('volume', volume); });
+$('volume').addEventListener('input', () => { volume = Number($('volume').value); direct.volume = enhanced.volume = remote.volume = volume / 100; keep('volume', volume); });
 
 $('error-close').addEventListener('click', clearFailure);
 $('album-back').addEventListener('click', () => { const to = opened ? opened.behind : 'home'; opened = null; show(to); });
-$('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(search, 300); });
+$('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(search, 140); });
 for (const tab of document.querySelectorAll('[data-tab]')) tab.addEventListener('click', () => { const view = tab.getAttribute('data-tab'); $('search').value = ''; searching += 1; opened = null; show(view); load(view); });
 $('fav').addEventListener('click', () => toggleSaved());
 $('list-form').addEventListener('submit', (event) => { event.preventDefault(); saveQueue(); });
@@ -912,7 +1018,7 @@ const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 async function faceOf(item) {
   if (!visual) return;
   let picture = '';
-  try { const found = await item.cover(600); picture = (Array.isArray(found) ? found[0] : found || '').replace(/^big:/, ''); } catch { picture = ''; }
+  try { picture = (await firstAddress(await item.cover(600))).replace(/^big:/, ''); } catch { picture = ''; }
   visual.setTrack(item.id, picture);
   sceneSince = performance.now();
 }

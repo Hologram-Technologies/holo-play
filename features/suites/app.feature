@@ -100,8 +100,29 @@ Feature: app
     Then the statement holds for every request
     And prism-code build replays the request heeds 000000 000050 000060 000030, bass held with mid ten ahead, answered heed 000000
 
+  @PL-01 @build
+  Scenario: A song plays from the companion, else an open full-length stream, else an embedded YouTube or SoundCloud player, else a preview; the player is chosen only when the holospace offers one, never over a stream the app can play itself, and always before a preview
+    Given the model in app/src/App.lex.tex
+    When prism-code check has Lean's kernel prove App.player_needs_the_channel, App.own_stream_beats_the_player, App.player_beats_the_preview, App.a_song_plays_when_any_source_has_it
+    Then the statement holds for every request
+    And prism-code build replays the request plays 000000 000000 000001 000001, a player and a preview with no stream, answered player
+
+  @PL-02 @build @rejects
+  Scenario: A YouTube identifier is accepted only as eleven characters, each a letter, a digit, a hyphen or an underscore
+    Given the model in app/src/App.lex.tex
+    When prism-code check has Lean's kernel prove App.identifier_characters_are_the_safe_ones
+    Then the statement holds for every request
+    And prism-code build replays the request ytids dQw4w9WgX/Q, an identifier holding a slash, answered not an identifier
+
+  @PL-03 @build @rejects
+  Scenario: An embedded player is shown only at 200 by 200 pixels or more and wholly inside the app's own frame
+    Given the model in app/src/App.lex.tex
+    When prism-code check has Lean's kernel prove App.shown_player_is_large_enough, App.shown_player_is_inside_the_app
+    Then the statement holds for every request
+    And prism-code build replays the request place 000199 000200 000000 000000 000800 000600, a player 199 pixels wide, answered too small
+
   @HP-08 @build @rejects
-  Scenario: A request is accepted only at one of the four lengths a request has; any other request is answered invalid request
+  Scenario: A request is accepted only at one of the five lengths a request has; any other request is answered invalid request
     Given the model in app/src/App.lex.tex
     When prism-code check has Lean's kernel prove App.accepts_exactly_a_request
     Then a request of any other length is refused

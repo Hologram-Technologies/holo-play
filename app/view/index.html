@@ -66,6 +66,10 @@
               <h3 class="font-display text-lg font-semibold tracking-tight" id="r-songs-title">Songs</h3>
               <ol data-slot="item-group" class="gap-1 list-none" id="r-songs" aria-label="Songs"></ol>
             </section>
+            <section aria-labelledby="r-open-title" class="grid grid-cols-1 gap-3" id="r-open-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-open-title">Plays in full</h3>
+              <ol data-slot="item-group" class="gap-1 list-none" id="r-open" aria-label="Songs from the catalogue"></ol>
+            </section>
             <section aria-labelledby="r-artists-title" class="grid grid-cols-1 gap-3" id="r-artists-box" hidden>
               <h3 class="font-display text-lg font-semibold tracking-tight" id="r-artists-title">Artists</h3>
               <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="r-artists"></div>
@@ -90,13 +94,10 @@
               <h3 class="font-display text-lg font-semibold tracking-tight" id="r-books-title">Audiobooks</h3>
               <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="r-books"></div>
             </section>
-            <section aria-labelledby="r-open-title" class="grid grid-cols-1 gap-3" id="r-open-box" hidden>
-              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-open-title">From the catalogue</h3>
-              <ol data-slot="item-group" class="gap-1 list-none" id="r-open" aria-label="Songs from the catalogue"></ol>
-            </section>
           </div>
 
           <div id="home" class="grid grid-cols-1 gap-10">
+            <div class="flex flex-wrap gap-2" id="moods" aria-label="Moods"></div>
             <section aria-labelledby="chart-title" class="grid grid-cols-1 gap-4" id="chart-box">
               <h2 id="chart-title" class="font-display text-2xl font-semibold tracking-tight">Top songs</h2>
               <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="chart" aria-busy="true">
@@ -155,6 +156,11 @@
                 <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
                 <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
               </div>
+            </section>
+
+            <section aria-labelledby="genres-title" class="grid grid-cols-1 gap-4">
+              <h2 id="genres-title" class="font-display text-2xl font-semibold tracking-tight">Browse genres</h2>
+              <div class="flex flex-wrap gap-2" id="genres"></div>
             </section>
 
             <section aria-labelledby="concerts-title" class="grid grid-cols-1 gap-4" id="concerts-box">
@@ -318,6 +324,10 @@
       </div>
     </div>
   </section>
+
+  <div hidden aria-hidden="true"><span data-slot="icon" data-icon="target"></span><span data-slot="icon" data-icon="zap"></span><span data-slot="icon" data-icon="coffee"></span><span data-slot="icon" data-icon="moon"></span></div>
+
+  <div id="dock" hidden class="fixed right-4 bottom-24 w-sm aspect-video rounded-xl bg-card border" aria-label="Player"></div>
 
   <dialog data-slot="sheet" data-side="right" id="sound" aria-labelledby="sound-title">
     <div data-slot="dialog-header">

@@ -9,7 +9,7 @@ Status: Phase 3 of 3 (Polish and ship). Published at https://github.com/Hologram
 
 ## What is proved, what is tested, what is neither
 
-**Proved.** The model is `app/src/App.lex.tex`. Lean's kernel proves 44 theorems about it. The claims are registered
+**Proved.** The model is `app/src/App.lex.tex`. Lean's kernel proves 51 theorems about it. The claims are registered
 in `model/ids.toml` and listed in the generated `CONFORMANCE.md`.
 
 | ID | Claim |
@@ -29,8 +29,11 @@ in `model/ids.toml` and listed in the generated `CONFORMANCE.md`.
 | VZ-04 | The detail step stays between zero and five, never rises while frames are slow, and holds inside a band |
 | VZ-05 | The mood is calm when the sound is quiet and never calmer for more energy or a faster tempo |
 | VZ-06 | The picture leans toward one of bass, mid and treble, keeps it unless another is clearly stronger, and moves only to the strongest |
+| PL-01 | A song plays from the companion, else an open full-length stream, else an embedded YouTube or SoundCloud player, else a preview; the player only when the holospace offers one |
+| PL-02 | A YouTube identifier is accepted only as eleven characters, each a letter, a digit, a hyphen or an underscore |
+| PL-03 | An embedded player is shown only at 200 by 200 pixels or more and wholly inside the app's own frame |
 
-**Tested.** 96 acceptance vectors, replayed by `build` and `verify`. Playback in a browser, recorded in
+**Tested.** 113 acceptance vectors, replayed by `build` and `verify`. Playback in a browser, recorded in
 [docs/VERIFICATION-holo-play.md](docs/VERIFICATION-holo-play.md).
 
 **Neither.** The page (`app/view/`) is authored, not proved. Network sources, how a track sounds, and timings are
@@ -49,6 +52,9 @@ links <extension> <host> <companion>               -> track | stream | album | c
 offer <kind> <companion>                           -> offer | hide
 seeks <position> <duration>                        -> resume | finished | restart
 picks <companion> <open> <preview>                 -> companion | open | preview | none
+plays <companion> <open> <player> <preview>        -> companion | open | player | preview | none
+ytids <eleven characters>                          -> valid | not an identifier
+place <wide> <tall> <left> <top> <frameWide> <frameTall> -> show | too small | outside
 shows <engine> <samples> <playing>                 -> react | rest | still
 moods <energy> <tempo>                             -> mood <n>
 scene <seconds> <beat> <boundary> <hold>           -> stay | blend | cut
@@ -96,8 +102,10 @@ anything else                                      -> invalid request
 - Charts on the home screen, drawn at once from the last visit and then refreshed: what is trending on Audius this
   week and of all time (these play in full), and the week's most played songs and albums across all music from
   ListenBrainz. A chart song plays where a source has it; otherwise the app says so and shows what can be played.
-  Covers come from the Cover Art Archive, which is kept on archive.org. Apple's and Deezer's charts send no CORS
+  Covers come from the Cover Art Archive, which is kept on archive.org; where that is out of reach, from TheAudioDB
+  by MusicBrainz id: the album's cover, or failing that a picture of the artist. Each answer is remembered. Apple's and Deezer's charts send no CORS
   header to any page, so they cannot be read.
+- Categories: five moods and eighteen genres, each what is trending in it this week on Audius, playing in full.
 - A verified library, no longer shown on the home screen at the owner's request: the three Hologram CC0 albums. Each track is fetched, its SHA-256 is re-derived, and it plays
   only if that matches the address in the library's catalogue. A mismatch is refused.
 - The Holo Audio Engine, ported unchanged: five-band EQ, bass and air shelves, crossfeed, a speaker stage for
@@ -141,11 +149,16 @@ There is no YouTube search route, and nothing in it streams commercial songs wit
 
 | Where Holo Play runs | Full-length songs from | Mainstream catalogue |
 | --- | --- | --- |
-| A holospace, the store | Audius, the Internet Archive, the verified library | Not available: iTunes sends no CORS header to a page with an opaque origin (seen with `Origin: null`), and Deezer sends none at all |
+| A holospace, the store | Audius, the Internet Archive, the verified library | Search names every song, artist and album through MusicBrainz. A named song plays only where Audius or the companion has it. iTunes and Deezer refuse a page with an opaque origin |
 | The Hologram host | The above, plus SoundCloud and pasted links through the companion | iTunes search and previews, when the page has an origin of its own |
 
 So a store visitor gets a Spotify-like player over an open catalogue, not over every commercial song. That limit
 is the services', not the app's.
+
+**YouTube and SoundCloud players.** PL-01 to PL-03 are the rules for playing through the services' own embedded
+players. They are proved, and the page asks all three. A player runs only in a holospace that holds one for the
+app: that is a change to holospace-shell (`docs/PLAN-holospace-players.md`), built on a local branch and not yet
+released. In the published holospace the page finds no player and plays from Audius, the companion or a preview.
 
 ## Open owner actions
 

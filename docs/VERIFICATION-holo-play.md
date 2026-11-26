@@ -274,3 +274,124 @@ from this machine, so every chart tile here showed its icon instead of a cover. 
 
 Not tested: playing a chart song (the match on Audius, and the fall to search when nothing has it), opening a
 chart album and its MusicBrainz track list, and the first visit with nothing remembered.
+
+## Chart artwork, second source, 2026-11-26
+
+Chart tiles showed only icons on this machine, because the Cover Art Archive is kept on archive.org and that host
+is unreachable here. Added TheAudioDB as a second source, looked up by MusicBrainz id: the album's cover, then the
+artist's picture, then the artist by name. Lookups run three at a time and every answer is remembered; once the
+archive has failed it is skipped for six hours so tiles do not wait on it.
+
+Seen in the holospace on this machine: all 12 album tiles showed their real covers, and 11 of 12 song tiles showed
+a picture, within about eight seconds of opening on a visit that had answers remembered. `verify` exit 0,
+44 theorems, 96 vectors.
+
+Known limits:
+
+- A chart song with no album id shows a picture of its artist, not the single's cover.
+- TheAudioDB's free access allows about thirty lookups a minute. A first visit makes up to about forty, so a few
+  tiles can stay as icons until the next visit. One tile did here.
+- Not seen: a first visit with nothing remembered, timed; and a network that reaches archive.org, where the
+  release's own cover should be used first.
+
+## Hologram OS Music compared, and categories, 2026-11-26
+
+Studied on the published site `hologram-technologies.github.io/hologram-os/`, as a guest:
+
+- Pressing Music started "Begin Again" at once. The page then held two frames: a SoundCloud widget
+  (`w.soundcloud.com/player/?url=…begin-again&auto_play=true`) and a YouTube embed with its script API
+  (`youtube.com/iframe_api`, `youtube.com/embed/…?enablejsapi=1`). So that site plays through the services' own
+  embedded players.
+- Its "Open full Holo Music" opens the Holo Music app already ported here.
+- The home screen in the owner's screenshots (decades, moments, "Top songs today", song search) was not found in the
+  site's 440 scripts and pages that could be fetched, nor in the public repositories. Its chart matches Apple's
+  top-songs feed and its search results read like the iTunes Search API, but its code was not seen, so how it finds
+  the recording to play for a searched song is not established.
+
+Why Holo Play cannot do the same inside a holospace today, both checked earlier in this file:
+
+- The holospace page policy names no `frame-src`, so no frame may load: no YouTube or SoundCloud player.
+- iTunes and Apple's charts send no CORS header to a page with an opaque origin.
+
+Both are limits of the holospace an app runs in, not of the app. Lifting them means a change to holospace-shell.
+
+Added in Holo Play: five moods (Focus, Energy, Chill, Night, Discover) and eighteen genres, each what is trending in
+it this week on Audius, playing in full. Seen in the holospace: the mood chips on the home screen; Chill opened with
+41 tracks and one played through the engine. `verify` exit 0, 44 theorems, 96 vectors. Not seen: the genre chips at
+the foot of the home screen, and the other four moods.
+
+## Catalogue search and the player rules, 2026-11-26
+
+### Gates
+
+`prism-code@0.11.5 build` and `verify`: 51 theorems proved, 113 of 113 vectors, identities verified, no design
+violations, 18 IDs with 18 scenarios.
+
+### Added
+
+- PL-01 `plays`, PL-02 `ytids`, PL-03 `place` in the model, with failure rows for `not an identifier` and
+  `too small`. These specify playing through an embedded YouTube or SoundCloud player.
+- Search fills Songs, Artists and Albums from MusicBrainz. Audius results sit beside them as "Plays in full".
+- Albums before EPs before singles, one tile a title; studio takes before live sets and remixes.
+- A catalogue song with no source no longer stops what is playing; it says so in a toast.
+
+### Tested in a browser, in the holospace
+
+- "ben bohmer": 24 songs, the artist, and his albums (Bloom, Begin Again, Breathing and on) appear in about four
+  seconds. Hologram OS Music answers the same search faster; MusicBrainz allows about one request a second.
+- Clicking a catalogue song Audius does not have: toast "No source can play ... in full here yet", and the track
+  that was playing carried on.
+- Home shelves, moods, genres and an Audius track still load and play.
+
+### Not tested, or not true yet
+
+- No YouTube or SoundCloud player runs. The page always sends `plays` with the player as 0. Most mainstream songs
+  found by search therefore do not play in a holospace.
+- Album covers: the Cover Art Archive is out of reach from this machine, so most tiles showed the artist's picture
+  from TheAudioDB instead of the album's cover. Not seen on a network that reaches the archive.
+- Opening an album or artist tile from the catalogue and listing its songs was not clicked through.
+- A song-title search (no artist named) was not tried.
+- The results list moved under the pointer once while it was still filling; cause not found.
+- Search ordering has no popularity signal: MusicBrainz gives none without a key.
+
+## Held players and the fast catalogue, 2026-11-26
+
+### What changed
+
+- holospace-shell, local branch `feat/player-channel` (not pushed): `player.mjs` adds `servePlayer` (the page holds a
+  YouTube or SoundCloud player for a View) and `serveCatalogue` (the page reads iTunes for a View); `space.mjs`
+  serves both. An app's own policy is unchanged: it still loads no frame.
+- Holo Play: asks the holospace what it holds. Where it holds players, search and the "Top songs" shelf read iTunes
+  through it, a song's video is found through Piped (as Holo TV's Music does), and the song plays in YouTube's own
+  player, laid over a dock at the lower right. Where it holds none, everything behaves as before.
+- The model is asked for real now: `ytids` before an identifier is used, `plays` with the player as 1, `place`
+  before the dock is used.
+
+### Gates
+
+Holo Play `build` and `verify` on prism-code 0.11.5: 51 theorems, 113 of 113 vectors, identities verified.
+holospace-shell: `test/player.test.mjs` 6 of 6; with view, embed and frame tests, 37 of 37. The shell's full suite
+and its browser tests were not run.
+
+### Tested in a browser
+
+Against a local copy of the published shell release with the two channels added, served on port 4318:
+
+- "Top songs" (iTunes chart) loads with covers.
+- Clicking a top song: the right "Topic" upload loads in the dock and plays; the bar shows time moving, pause and
+  the next song work by click.
+- "ben bohmer": the same songs Holo TV lists (Breathing, Rust, Hiding ...), in about a second. "Rust" played.
+
+### Not tested, or not true yet
+
+- Nobody outside this machine has this: it needs the shell change merged and released, and prism-code and the
+  store serving that release. The published holospace still offers no player.
+- Sound was not heard; the test pane gives no audio. Only the player's reported state was seen.
+- Seek, volume, end-of-song advance, repeat and the media keys were not exercised on a held player.
+- SoundCloud: the shell holds its player and the tests cover it, but Holo Play does not ask for it yet.
+- A held player's sound cannot be read, so the engine, the EQ and the visual do not act on these songs.
+- Video lookup rests on public Piped hosts. One of seven answered today. If none answers, catalogue songs fall
+  back to Audius or a preview.
+- The dock covers the lower right of the page, 384 by 216. A window too small for it refuses the song.
+- Artist and album pages from the fast catalogue were not opened.
+

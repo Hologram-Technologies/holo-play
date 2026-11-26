@@ -34,7 +34,10 @@ The three honesty levels (R2):
 | `VZ-04` | `build` | The detail step stays between zero and five, never rises while frames are slow, and holds inside the band between fourteen and twenty-two milliseconds | `App.detail_stays_in_range`, `App.detail_never_rises_when_slow`, `App.detail_holds_in_the_band` |
 | `VZ-05` | `build` | The mood is one of four steps, calm when the sound is quiet, and never calmer for more energy or a faster tempo | `App.mood_stays_in_range`, `App.quiet_is_calm`, `App.more_energy_is_never_calmer`, `App.faster_is_never_calmer` |
 | `VZ-06` | `build` | The picture leans toward one of bass, mid and treble, keeps it unless another is clearly stronger, and moves only to the strongest | `App.attention_stays_in_range`, `App.attention_holds_unless_clearly_beaten`, `App.attention_moves_to_the_strongest` |
-| `HP-08` | `build` | A request is accepted only at one of the four lengths a request has; any other request is answered invalid request | `App.accepts_exactly_a_request`, refuses with `invalid request` |
+| `PL-01` | `build` | A song plays from the companion, else an open full-length stream, else an embedded YouTube or SoundCloud player, else a preview; the player is chosen only when the holospace offers one, never over a stream the app can play itself, and always before a preview | `App.player_needs_the_channel`, `App.own_stream_beats_the_player`, `App.player_beats_the_preview`, `App.a_song_plays_when_any_source_has_it` |
+| `PL-02` | `build` | A YouTube identifier is accepted only as eleven characters, each a letter, a digit, a hyphen or an underscore | `App.identifier_characters_are_the_safe_ones`, refuses with `not an identifier` |
+| `PL-03` | `build` | An embedded player is shown only at 200 by 200 pixels or more and wholly inside the app's own frame | `App.shown_player_is_large_enough`, `App.shown_player_is_inside_the_app`, refuses with `too small` |
+| `HP-08` | `build` | A request is accepted only at one of the five lengths a request has; any other request is answered invalid request | `App.accepts_exactly_a_request`, refuses with `invalid request` |
 
 ## Cited authorities
 
