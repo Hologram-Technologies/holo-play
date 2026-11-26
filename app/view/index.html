@@ -18,6 +18,7 @@
   <script src="library.js"></script>
   <script src="subsonic.js"></script>
   <script src="sources.js"></script>
+  <script src="visuals.js"></script>
   <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -32,6 +33,7 @@
         <div data-slot="input-group">
           <input data-slot="input-group-control" id="search" type="search" placeholder="Search songs, artists, albums" autocomplete="off" spellcheck="false">
           <div data-slot="input-group-addon"><span data-slot="icon" data-icon="search" aria-hidden="true"></span></div>
+          <div data-slot="input-group-addon" data-align="inline-end" class="hidden md:flex"><kbd data-slot="kbd" aria-hidden="true">/</kbd></div>
         </div>
       </div>
       <div class="flex items-center gap-2">
@@ -65,6 +67,10 @@
               <h3 class="font-display text-lg font-semibold tracking-tight" id="r-songs-title">Songs</h3>
               <ol data-slot="item-group" class="gap-1 list-none" id="r-songs" aria-label="Songs"></ol>
             </section>
+            <section aria-labelledby="r-open-title" class="grid grid-cols-1 gap-3" id="r-open-box" hidden>
+              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-open-title">Plays in full</h3>
+              <ol data-slot="item-group" class="gap-1 list-none" id="r-open" aria-label="Songs from the catalogue"></ol>
+            </section>
             <section aria-labelledby="r-artists-title" class="grid grid-cols-1 gap-3" id="r-artists-box" hidden>
               <h3 class="font-display text-lg font-semibold tracking-tight" id="r-artists-title">Artists</h3>
               <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="r-artists"></div>
@@ -89,13 +95,10 @@
               <h3 class="font-display text-lg font-semibold tracking-tight" id="r-books-title">Audiobooks</h3>
               <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="r-books"></div>
             </section>
-            <section aria-labelledby="r-open-title" class="grid grid-cols-1 gap-3" id="r-open-box" hidden>
-              <h3 class="font-display text-lg font-semibold tracking-tight" id="r-open-title">From the catalogue</h3>
-              <ol data-slot="item-group" class="gap-1 list-none" id="r-open" aria-label="Songs from the catalogue"></ol>
-            </section>
           </div>
 
           <div id="home" class="grid grid-cols-1 gap-10">
+            <div class="flex flex-wrap gap-2" id="moods" aria-label="Moods"></div>
             <section aria-labelledby="chart-title" class="grid grid-cols-1 gap-4" id="chart-box">
               <h2 id="chart-title" class="font-display text-2xl font-semibold tracking-tight">Top songs</h2>
               <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="chart" aria-busy="true">
@@ -116,6 +119,26 @@
               </div>
             </section>
 
+            <section aria-labelledby="world-songs-title" class="grid grid-cols-1 gap-4" id="world-songs-box">
+              <h2 id="world-songs-title" class="font-display text-2xl font-semibold tracking-tight">Top songs this week</h2>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="world-songs" aria-busy="true">
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+              </div>
+            </section>
+
+            <section aria-labelledby="world-albums-title" class="grid grid-cols-1 gap-4" id="world-albums-box">
+              <h2 id="world-albums-title" class="font-display text-2xl font-semibold tracking-tight">Top albums this week</h2>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="world-albums" aria-busy="true">
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+              </div>
+            </section>
+
             <section aria-labelledby="hot-title" class="grid grid-cols-1 gap-4" id="hot-box">
               <h2 id="hot-title" class="font-display text-2xl font-semibold tracking-tight">Hot playlists</h2>
               <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="hot" aria-busy="true">
@@ -126,9 +149,19 @@
               </div>
             </section>
 
-            <section aria-labelledby="bundled-title" class="grid grid-cols-1 gap-4">
-              <h2 id="bundled-title" class="font-display text-2xl font-semibold tracking-tight">Verified originals</h2>
-              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="bundled"></div>
+            <section aria-labelledby="classics-title" class="grid grid-cols-1 gap-4" id="classics-box">
+              <h2 id="classics-title" class="font-display text-2xl font-semibold tracking-tight">All-time favourites</h2>
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="classics" aria-busy="true">
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+                <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
+              </div>
+            </section>
+
+            <section aria-labelledby="genres-title" class="grid grid-cols-1 gap-4">
+              <h2 id="genres-title" class="font-display text-2xl font-semibold tracking-tight">Browse genres</h2>
+              <div class="flex flex-wrap gap-2" id="genres"></div>
             </section>
 
             <section aria-labelledby="concerts-title" class="grid grid-cols-1 gap-4" id="concerts-box">
@@ -223,11 +256,18 @@
               <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="album-albums"></div>
             </section>
           </section>
+          <div aria-hidden="true"><div class="h-24"></div><div id="foot-tall" hidden><div class="h-24"></div><div class="h-12"></div></div></div>
         </div>
       </div>
 
-      <section class="border-t bg-card px-6 py-3" id="player" aria-label="Player" hidden>
-        <div class="w-full max-w-6xl mx-auto grid gap-2">
+      <section class="fixed bottom-0 left-0 right-0 border-t bg-card/60 backdrop-blur px-6 py-3" id="player" aria-label="Player" hidden>
+        <div class="w-full max-w-6xl mx-auto flex items-center gap-4">
+          <div class="grid grid-cols-2 gap-2 shrink-0" id="bar-slot" aria-hidden="true" hidden><div class="w-24 aspect-square"></div><div class="w-24 aspect-square"></div><div class="w-24 aspect-square"></div><div class="w-24 aspect-square"></div></div>
+          <div class="grid gap-3 flex-1 min-w-0">
+          <div class="grid min-w-0" id="bar-big" hidden>
+            <p class="font-display text-2xl font-semibold tracking-tight truncate" id="bar-big-title"></p>
+            <p class="text-sm text-muted-foreground truncate" id="bar-big-artist"></p>
+          </div>
           <div class="flex items-center gap-3">
             <div class="flex items-center justify-center overflow-hidden size-12 rounded-md bg-muted shrink-0" id="now-cover"></div>
             <div class="grid min-w-0 flex-1">
@@ -239,6 +279,7 @@
               <span class="whitespace-nowrap" id="now-quality"></span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
+              <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="See the music" data-tooltip="See the music (V)" id="now-open"><span data-slot="icon" data-icon="sparkles" aria-hidden="true"></span></button>
               <button data-slot="toggle" data-size="sm" type="button" aria-pressed="false" aria-label="Save" data-tooltip="Save" id="fav"><span data-slot="icon" data-icon="heart" aria-hidden="true"></span></button>
               <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Back 15 seconds" data-tooltip="Back 15 seconds" id="skip-back" hidden><span data-slot="icon" data-icon="rotate-ccw" aria-hidden="true"></span></button>
               <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Forward 30 seconds" data-tooltip="Forward 30 seconds" id="skip-on" hidden><span data-slot="icon" data-icon="rotate-cw" aria-hidden="true"></span></button>
@@ -258,9 +299,43 @@
           </div>
           <p class="md:hidden text-xs text-muted-foreground truncate" id="now-line"></p>
         </div>
+        </div>
       </section>
     </main>
   </div>
+
+  <section class="fixed inset-0 z-overlay bg-background flex flex-col" id="now" aria-label="Now playing" hidden>
+    <canvas class="absolute inset-0 w-full h-full" id="stage" aria-hidden="true"></canvas>
+    <div class="absolute inset-0 overflow-hidden" id="now-aura" aria-hidden="true" hidden></div>
+    <div class="relative flex items-center justify-between px-6 py-4 transition" id="now-top">
+      <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Close" data-tooltip="Close (Esc)" id="now-close"><span data-slot="icon" data-icon="chevron-down" aria-hidden="true"></span></button>
+      <div class="flex items-center gap-1">
+        <button data-slot="toggle" data-size="sm" type="button" aria-pressed="false" aria-label="Keep this scene" data-tooltip="Keep this scene" id="now-lock"><span data-slot="icon" data-icon="lock" aria-hidden="true"></span></button>
+        <button data-slot="toggle" data-size="sm" type="button" aria-pressed="true" data-state="on" aria-label="Animation" data-tooltip="Animation" id="now-motion"><span data-slot="icon" data-icon="eye" aria-hidden="true" id="motion-on"></span><span data-slot="icon" data-icon="eye-off" aria-hidden="true" id="motion-off" hidden></span></button>
+      </div>
+    </div>
+    <div class="relative flex-1 min-h-0 flex flex-col items-center justify-center gap-4 px-6" id="now-still" hidden>
+      <div class="flex items-center justify-center overflow-hidden w-full max-w-md aspect-square rounded-xl bg-muted shadow-md" id="now-art"></div>
+      <p class="max-w-md text-center text-sm text-muted-foreground" id="now-why">This source does not let the app read its sound, so there is nothing true to draw.</p>
+    </div>
+    <div class="relative flex-1 min-h-0" id="now-space"></div>
+    <div class="relative px-6 py-6 transition" id="now-bottom">
+      <div class="w-full max-w-3xl mx-auto flex items-end justify-between gap-4">
+        <div class="grid grid-cols-1 gap-1 min-w-0">
+          <p class="font-display text-3xl font-semibold tracking-tight truncate" id="now-big-title"></p>
+          <p class="text-muted-foreground truncate" id="now-big-artist"></p>
+          <p class="text-xs text-muted-foreground truncate" id="now-big-line"></p>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Previous" id="now-prev"><span data-slot="icon" data-icon="chevron-left" aria-hidden="true"></span></button>
+          <button data-slot="button" data-variant="brand" data-size="icon" class="rounded-full" type="button" aria-label="Play or pause" id="now-play"><span data-slot="icon" data-icon="play" aria-hidden="true" id="now-play-icon"></span><span data-slot="icon" data-icon="pause" aria-hidden="true" id="now-pause-icon" hidden></span></button>
+          <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Next" id="now-next"><span data-slot="icon" data-icon="chevron-right" aria-hidden="true"></span></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div hidden aria-hidden="true"><span data-slot="icon" data-icon="target"></span><span data-slot="icon" data-icon="zap"></span><span data-slot="icon" data-icon="coffee"></span><span data-slot="icon" data-icon="moon"></span></div>
 
   <dialog data-slot="sheet" data-side="right" id="sound" aria-labelledby="sound-title">
     <div data-slot="dialog-header">

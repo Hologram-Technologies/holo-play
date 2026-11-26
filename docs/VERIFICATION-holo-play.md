@@ -190,3 +190,255 @@ Not done in Phase 3:
 - Light mode and phone width with real content, and any real phone, Firefox or Safari.
 - Genre shortcuts, speed, skip back, and opening and deleting a playlist were not exercised.
 - Not published. No repository, registry entry or store listing exists yet.
+
+## Seeing the music, 2026-11-26, prism-code 0.11.5
+
+### Gates
+
+| Command | Result |
+| --- | --- |
+| `build` | 41 theorems proved, 87 of 87 vectors passed, 0 design violations |
+| `verify` | exit 0: 41 of 41 theorems, identities verified, 87 of 87 vectors |
+
+### Planted defect
+
+- Defect: in `App.show`, the engine test was removed, so a source the page cannot read could be drawn as sound.
+- Result: `check` exit 1, `contract.theorem-unproved` for VZ-01, `direct_is_never_drawn_as_sound` not proved.
+- Restored: 41 of 41.
+
+### Tested in a browser, in the holospace
+
+| What | Result |
+| --- | --- |
+| The view opens over the app from the player; the picture draws and moves while a track plays through the engine | passed |
+| A wide stereo mix draws as two lines, apart | passed |
+| The scene changed during play, and the colour moved | passed |
+| The title and controls fade while the picture reacts | passed |
+| Bright areas no longer pile up into white (seen before the fix, not after) | passed |
+
+### Not tested
+
+- That a flash and its drum hit arrive together: the picture is not yet delayed by the output latency.
+- `still` for a direct source, `rest` when paused or silent, the lock, touch, the cover laid into the picture,
+  reduced motion, the detail ladder under load, and radio or podcasts now trying the engine first.
+- Whether tempo, key, brightness and width are measured correctly. They are computed from the samples; no known
+  test signal was played to check the numbers.
+- Frame rate, phones, Firefox and Safari. Nothing here was heard by a person: the test pane has no speakers I can use.
+
+## Resolution, attention and more of the sound, 2026-11-26
+
+`build` and `verify`: 44 theorems proved, 96 of 96 vectors, 0 design violations (see the run below this section's
+commit). Added: VZ-06 attention; the detail ladder now has six steps, the top three drawing more pixels than the
+screen has, capped at 7680 by 4320; sixteen-bit float colour where available; attack and noisiness measured from
+the spectrum.
+
+Seen in the holospace: the picture drew and reacted, and the on-screen line read "drawn at 1669 × 573", the test
+pane's own pixel count. About ten seconds later it read "drawn at 668 × 229": the model had stepped the detail down
+to its lowest step because frames in the test pane took longer than 22 ms.
+
+Measured, not asserted: that step-down. Whether it came from the picture's cost or from the pane limiting frames
+was not established. A display that refreshes 30 times a second would be held at the lowest step by this rule;
+that is a known weakness.
+
+Not tested: any step above the screen's own pixels, an 8K or 4K display, whether float colour was in use, the
+attention rule's effect by eye, attack and noisiness against a known signal, and everything listed as untested in
+the section above.
+
+## Animation switch, 2026-11-26
+
+An eye button in the visual view switches the animation off and on; the choice is kept. Off shows the cover and
+draws nothing. Seen in the holospace: off showed the cover with the crossed eye, on resumed the picture. `verify`
+exit 0, 44 theorems, 96 vectors. Not seen: the choice surviving a reload, and the final tooltip wording.
+
+## Live charts on the home screen, 2026-11-26
+
+Sources tested with the headers a sandboxed page sends (`Origin: null`):
+
+| Source | Result |
+| --- | --- |
+| ListenBrainz sitewide recordings, release groups, artists (week) | open CORS, used |
+| Audius trending by week, month, all time and genre; trending playlists | open CORS, used |
+| MusicBrainz release lookup | open CORS, used for an album's tracks |
+| Hype Machine popular | open CORS, not used |
+| Apple most-played charts (`rss.marketingtools.apple.com`) | no CORS header for any origin, unusable |
+| Deezer chart | no CORS header, unusable |
+| TheAudioDB | no artwork for the albums tried, not used |
+| Wikipedia and Wikidata | answered 429 to this machine, not established |
+
+Seen in the holospace: two seconds after opening, Trending now and Top songs this week were already drawn from
+the last visit. Top songs this week, Top albums this week and All-time favourites all filled. The Verified
+originals shelf is gone from the home screen. `verify` exit 0, 44 theorems, 96 vectors.
+
+Known gap: chart covers come from the Cover Art Archive, which is kept on archive.org. That host is unreachable
+from this machine, so every chart tile here showed its icon instead of a cover. No second artwork source was found.
+
+Not tested: playing a chart song (the match on Audius, and the fall to search when nothing has it), opening a
+chart album and its MusicBrainz track list, and the first visit with nothing remembered.
+
+## Chart artwork, second source, 2026-11-26
+
+Chart tiles showed only icons on this machine, because the Cover Art Archive is kept on archive.org and that host
+is unreachable here. Added TheAudioDB as a second source, looked up by MusicBrainz id: the album's cover, then the
+artist's picture, then the artist by name. Lookups run three at a time and every answer is remembered; once the
+archive has failed it is skipped for six hours so tiles do not wait on it.
+
+Seen in the holospace on this machine: all 12 album tiles showed their real covers, and 11 of 12 song tiles showed
+a picture, within about eight seconds of opening on a visit that had answers remembered. `verify` exit 0,
+44 theorems, 96 vectors.
+
+Known limits:
+
+- A chart song with no album id shows a picture of its artist, not the single's cover.
+- TheAudioDB's free access allows about thirty lookups a minute. A first visit makes up to about forty, so a few
+  tiles can stay as icons until the next visit. One tile did here.
+- Not seen: a first visit with nothing remembered, timed; and a network that reaches archive.org, where the
+  release's own cover should be used first.
+
+## Hologram OS Music compared, and categories, 2026-11-26
+
+Studied on the published site `hologram-technologies.github.io/hologram-os/`, as a guest:
+
+- Pressing Music started "Begin Again" at once. The page then held two frames: a SoundCloud widget
+  (`w.soundcloud.com/player/?url=…begin-again&auto_play=true`) and a YouTube embed with its script API
+  (`youtube.com/iframe_api`, `youtube.com/embed/…?enablejsapi=1`). So that site plays through the services' own
+  embedded players.
+- Its "Open full Holo Music" opens the Holo Music app already ported here.
+- The home screen in the owner's screenshots (decades, moments, "Top songs today", song search) was not found in the
+  site's 440 scripts and pages that could be fetched, nor in the public repositories. Its chart matches Apple's
+  top-songs feed and its search results read like the iTunes Search API, but its code was not seen, so how it finds
+  the recording to play for a searched song is not established.
+
+Why Holo Play cannot do the same inside a holospace today, both checked earlier in this file:
+
+- The holospace page policy names no `frame-src`, so no frame may load: no YouTube or SoundCloud player.
+- iTunes and Apple's charts send no CORS header to a page with an opaque origin.
+
+Both are limits of the holospace an app runs in, not of the app. Lifting them means a change to holospace-shell.
+
+Added in Holo Play: five moods (Focus, Energy, Chill, Night, Discover) and eighteen genres, each what is trending in
+it this week on Audius, playing in full. Seen in the holospace: the mood chips on the home screen; Chill opened with
+41 tracks and one played through the engine. `verify` exit 0, 44 theorems, 96 vectors. Not seen: the genre chips at
+the foot of the home screen, and the other four moods.
+
+## Catalogue search and the player rules, 2026-11-26
+
+### Gates
+
+`prism-code@0.11.5 build` and `verify`: 51 theorems proved, 113 of 113 vectors, identities verified, no design
+violations, 18 IDs with 18 scenarios.
+
+### Added
+
+- PL-01 `plays`, PL-02 `ytids`, PL-03 `place` in the model, with failure rows for `not an identifier` and
+  `too small`. These specify playing through an embedded YouTube or SoundCloud player.
+- Search fills Songs, Artists and Albums from MusicBrainz. Audius results sit beside them as "Plays in full".
+- Albums before EPs before singles, one tile a title; studio takes before live sets and remixes.
+- A catalogue song with no source no longer stops what is playing; it says so in a toast.
+
+### Tested in a browser, in the holospace
+
+- "ben bohmer": 24 songs, the artist, and his albums (Bloom, Begin Again, Breathing and on) appear in about four
+  seconds. Hologram OS Music answers the same search faster; MusicBrainz allows about one request a second.
+- Clicking a catalogue song Audius does not have: toast "No source can play ... in full here yet", and the track
+  that was playing carried on.
+- Home shelves, moods, genres and an Audius track still load and play.
+
+### Not tested, or not true yet
+
+- No YouTube or SoundCloud player runs. The page always sends `plays` with the player as 0. Most mainstream songs
+  found by search therefore do not play in a holospace.
+- Album covers: the Cover Art Archive is out of reach from this machine, so most tiles showed the artist's picture
+  from TheAudioDB instead of the album's cover. Not seen on a network that reaches the archive.
+- Opening an album or artist tile from the catalogue and listing its songs was not clicked through.
+- A song-title search (no artist named) was not tried.
+- The results list moved under the pointer once while it was still filling; cause not found.
+- Search ordering has no popularity signal: MusicBrainz gives none without a key.
+
+## Held players and the fast catalogue, 2026-11-26
+
+### What changed
+
+- holospace-shell, local branch `feat/player-channel` (not pushed): `player.mjs` adds `servePlayer` (the page holds a
+  YouTube or SoundCloud player for a View) and `serveCatalogue` (the page reads iTunes for a View); `space.mjs`
+  serves both. An app's own policy is unchanged: it still loads no frame.
+- Holo Play: asks the holospace what it holds. Where it holds players, search and the "Top songs" shelf read iTunes
+  through it, a song's video is found through Piped (as Holo TV's Music does), and the song plays in YouTube's own
+  player, laid over a dock at the lower right. Where it holds none, everything behaves as before.
+- The model is asked for real now: `ytids` before an identifier is used, `plays` with the player as 1, `place`
+  before the dock is used.
+
+### Gates
+
+Holo Play `build` and `verify` on prism-code 0.11.5: 51 theorems, 113 of 113 vectors, identities verified.
+holospace-shell: `test/player.test.mjs` 6 of 6; with view, embed and frame tests, 37 of 37. The shell's full suite
+and its browser tests were not run.
+
+### Tested in a browser
+
+Against a local copy of the published shell release with the two channels added, served on port 4318:
+
+- "Top songs" (iTunes chart) loads with covers.
+- Clicking a top song: the right "Topic" upload loads in the dock and plays; the bar shows time moving, pause and
+  the next song work by click.
+- "ben bohmer": the same songs Holo TV lists (Breathing, Rust, Hiding ...), in about a second. "Rust" played.
+
+### Not tested, or not true yet
+
+- Nobody outside this machine has this: it needs the shell change merged and released, and prism-code and the
+  store serving that release. The published holospace still offers no player.
+- Sound was not heard; the test pane gives no audio. Only the player's reported state was seen.
+- Seek, volume, end-of-song advance, repeat and the media keys were not exercised on a held player.
+- SoundCloud: the shell holds its player and the tests cover it, but Holo Play does not ask for it yet.
+- A held player's sound cannot be read, so the engine, the EQ and the visual do not act on these songs.
+- Video lookup rests on public Piped hosts. One of seven answered today. If none answers, catalogue songs fall
+  back to Audius or a preview.
+- The dock covers the lower right of the page, 384 by 216. A window too small for it refuses the song.
+- Artist and album pages from the fast catalogue were not opened.
+
+
+## Cover tile and the search box, 2026-11-26
+
+- Owner's decision: the YouTube player is not hidden (its terms forbid that); it is shown as a 200 by 200 cover at
+  the lower left, the least size PL-03 allows.
+- Search: results stay on the page while typing and each group is replaced when its answer comes; catalogue
+  answers are kept for the session; the sources are asked 70 ms after the last key (180 ms under three letters);
+  Enter asks at once, Escape clears, focus selects, `/` and Ctrl+K reach the box.
+- Gates: `build` and `verify`, 51 theorems, 113 of 113 vectors.
+- Seen in the patched holospace: "ben" then " bohmer" typed a second apart; the first list stayed until the second
+  replaced it; "Rust" played in the 200-pixel tile.
+- Not measured: the time from key to results in milliseconds. Not seen: the tile on a narrow window, where it
+  covers the start of list rows.
+- Sound quality on a YouTube song is YouTube's: the embedded player gives no control over the audio stream. Holo
+  Play's own rule (HP-01, PL-01) already prefers a lossless or full stream it can play itself over the player.
+
+## The player as the cover, 2026-11-26
+
+- In the immersive view a held player takes the cover's own place: centred, up to 448 pixels square, with the
+  cover's colours spread behind it (the cover drawn eight pixels wide and stretched; it is artwork, not a picture
+  of the sound). Outside that view it is the 200-pixel tile. The model is asked `place` before each move.
+- The shell takes `plain: true` on `load` and asks YouTube for no control bar; Holo Play's own transport drives it.
+- Gates: Holo Play `build` and `verify`, 51 theorems, 113 of 113 vectors. Shell `test/player.test.mjs` 6 of 6.
+- Seen in the patched holospace: a top song playing in the tile, then `v`: the player moved to the centre over the
+  coloured backdrop, title and transport below.
+- Not seen: closing the view (the move back to the tile), a window resize, a small window. YouTube still draws its
+  own title and "More videos" strip on hover and when paused; that is YouTube's and is not covered.
+
+## The player in the bar, 2026-11-26
+
+- The 200 by 200 player now stands in the player bar where the cover is: its left on the cover's left, its foot on
+  the cover row's line, the title beside it in a slot the bar keeps for it. The bar's small cover is hidden while
+  it shows. 200 by 200 is the least YouTube's terms and PL-03 allow; the bar is shorter, so the player rises above it.
+- Gates: `build` and `verify`, 51 theorems, 113 of 113 vectors.
+- Seen in the patched holospace: a chart song playing with the player in the bar's slot and the title beside it.
+- Not seen: a narrow window, where the slot takes most of the bar's width; the move to and from the immersive view
+  after this change.
+
+## The glass bar, 2026-11-26
+
+- Owner's direction: no fuzzy coloured backdrop in the bar; translucent glass instead. The player bar now lies over
+  the page (`bg-card/60`, `backdrop-blur`), and the page keeps room at its foot so its last rows scroll clear.
+- While a held player shows, the bar grows to hold the 200 by 200 player whole, with a large title, the artist and
+  the transport beside it. For every other source the bar is its usual height, also glass.
+- Gates: `build` and `verify`, 51 theorems, 113 of 113 vectors.
+- Seen in the patched holospace: a chart song in the tall bar, shelves showing blurred through it while scrolling.
+- Not seen: the light theme, a narrow window, the queue and sound sheets over the glass bar.
