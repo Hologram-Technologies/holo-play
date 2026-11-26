@@ -162,6 +162,7 @@ async function start(index) {
   try {
     await prepare(current);
     if (mine !== turn) return;
+    if (!current.reps.length && current.source === 'chart') { lookFor(current); return; }
     if (!current.reps.length) { draw(); fail('No source has this song', `Nothing playable was found for “${current.title}”. Try another version of it.`); return; }
     await ranked(current);
     if (mine === turn) await attempt(mine);
@@ -565,6 +566,31 @@ function search() {
   companion.probe().then(() => ask('offer', 1, companion.present() ? 1 : 0)).then((answer) => (answer === 'offer' ? companion.search(term, 12) : [])).then(list('r-sc')).catch(() => {});
 }
 
+/** A chart song no source has in full: say so, and show what can be played for it instead. */
+function lookFor(item) {
+  queue = []; at = -1; current = null; turn += 1;
+  silence();
+  draw();
+  globalThis.ui.toast(`No full source has “${item.title}” here. Showing what can be played.`);
+  $('search').value = `${item.artist} ${item.title}`;
+  search();
+}
+
+/** A chart shelf: drawn at once from the last visit, then again when the fresh answer arrives. */
+function chartShelf(id, chart, drawOne) {
+  const box = $(id);
+  const put = (rows) => {
+    const items = rows.map(chart.make);
+    box.replaceChildren(...items.map((item, i) => drawOne(item, items, i)));
+    box.removeAttribute('aria-busy');
+    markPlaying();
+  };
+  const had = chart.now();
+  if (had.length) put(had);
+  chart.fresh().then((rows) => { if (rows.length) put(rows); else if (!had.length) $(`${id}-box`).hidden = true; })
+    .catch(() => { if (!had.length) $(`${id}-box`).hidden = true; });
+}
+
 async function shelf(id, load, drawOne, failed) {
   const box = $(id);
   try {
@@ -586,9 +612,12 @@ function load(view) {
   const { catalogue, audius, radio, soma, podcasts } = globalThis.HoloSources;
   if (view === 'home') {
     shelf('chart', () => catalogue.chart(12), songTile);
-    shelf('trending', () => audius.trending(12), songTile);
+    const { charts } = globalThis.HoloSources;
+    chartShelf('trending', charts.trending, songTile);
+    chartShelf('world-songs', charts.songs, songTile);
+    chartShelf('world-albums', charts.albums, entryTile);
+    chartShelf('classics', charts.classics, songTile);
     shelf('hot', () => audius.hot(6), entryTile);
-    $('bundled').replaceChildren(...globalThis.HoloLibrary.bundled().map(entryTile));
     shelf('concerts', () => globalThis.HoloLibrary.concerts(6), entryTile); // out of reach, the shelf steps aside
   } else if (view === 'radio') {
     $('themes').replaceChildren(...THEMES.map((name) => h('button', { slot: 'button', variant: 'outline', size: 'sm', type: 'button', onclick: () => stations(name, () => radio.byTag(name.toLowerCase(), 40)) }, name)));
@@ -871,6 +900,7 @@ addEventListener('keydown', (event) => {
 let showing = 'still';
 let detailStep = 2;
 let heeding = 0;
+let motion = kept('motion', true); // the listener's own switch: with it off the cover is shown and nothing is drawn
 let drawn = '';        // the picture's own size in pixels, as last measured
 let sceneSince = 0;
 let sceneLocked = false;
@@ -893,16 +923,24 @@ function drawNow() {
   $('now-big-title').textContent = current.title;
   $('now-big-artist').textContent = nowLine || [current.artist, current.album].filter(Boolean).join(' · ');
   const sound = current.reps.length ? `${rep.label} · ${routed === 'engine' ? `Engine · ${preset}` : 'Direct'}` : rep.label;
-  $('now-big-line').textContent = showing !== 'still' && drawn ? `${sound} · drawn at ${drawn}` : sound;
-  $('stage').hidden = showing === 'still';
-  $('now-still').hidden = showing !== 'still';
-  $('now-space').hidden = showing === 'still';
-  if (showing === 'still') drawCover($('now-art'), current, 320);
+  $('now-big-line').textContent = motion && showing !== 'still' && drawn ? `${sound} · drawn at ${drawn}` : sound;
+  const quiet = !motion || showing === 'still';
+  $('stage').hidden = quiet;
+  $('now-still').hidden = !quiet;
+  $('now-space').hidden = quiet;
+  $('now-why').hidden = !motion; // the reason is given only when the app, not the listener, holds the picture back
+  $('now-lock').hidden = !motion;
+  $('now-motion').setAttribute('aria-pressed', String(motion));
+  $('now-motion').setAttribute('data-state', motion ? 'on' : 'off');
+  $('now-motion').setAttribute('aria-label', motion ? 'Animation: on' : 'Animation: off');
+  $('motion-on').hidden = !motion;
+  $('motion-off').hidden = motion;
+  if (quiet) drawCover($('now-art'), current, 320);
 }
 
 /** Once a second: may the picture react, how hard, and at what detail. */
 async function watch() {
-  if ($('now').hidden || !visual) return;
+  if ($('now').hidden || !visual || !motion) return;
   const seen = visual.stats();
   const answer = await ask('shows', routed === 'engine' ? 1 : 0, seen.live ? 1 : 0, current && !audio.paused ? 1 : 0);
   if (answer !== showing) { showing = answer; visual.setMode(showing); drawNow(); }
@@ -946,7 +984,7 @@ function openNow() {
   }
   $('now').hidden = false;
   showing = 'still';
-  if (visual) { visual.setMode('still'); faceOf(current); visual.start(); }
+  if (visual) { visual.setMode('still'); faceOf(current); if (motion) visual.start(); }
   drawNow();
   watch();
   watching = setInterval(watch, 1000);
@@ -962,7 +1000,7 @@ function closeNow() {
 function stir() {
   for (const id of ['now-top', 'now-bottom']) $(id).classList.remove('opacity-0');
   clearTimeout(idle);
-  idle = setTimeout(() => { if (showing === 'react') for (const id of ['now-top', 'now-bottom']) $(id).classList.add('opacity-0'); }, 3500);
+  idle = setTimeout(() => { if (motion && showing === 'react') for (const id of ['now-top', 'now-bottom']) $(id).classList.add('opacity-0'); }, 3500);
 }
 $('now').addEventListener('pointermove', stir);
 $('now').addEventListener('pointerdown', stir);
@@ -971,6 +1009,14 @@ $('now-close').addEventListener('click', closeNow);
 $('now-prev').addEventListener('click', () => previous());
 $('now-next').addEventListener('click', () => next(false));
 $('now-play').addEventListener('click', () => $('play').click());
+$('now-motion').addEventListener('click', () => {
+  motion = !motion;
+  keep('motion', motion);
+  if (visual) { if (motion) { showing = 'still'; visual.setMode('still'); visual.start(); } else visual.stop(); }
+  drawNow();
+  stir();
+  if (motion) watch();
+});
 $('now-lock').addEventListener('click', () => {
   sceneLocked = !sceneLocked;
   $('now-lock').setAttribute('aria-pressed', String(sceneLocked));

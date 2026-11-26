@@ -209,5 +209,50 @@
 
   const preview = (item) => (item.preview ? { url: item.preview, type: 'audio/mp4', lossless: 1, bits: 0, kbps: 0, label: 'Preview · AAC · 30 seconds', preview: true } : null);
 
-  globalThis.HoloSources = { catalogue, audius, companion, preview, radio, soma, podcasts, big };
+  // ---- charts: what is popular now, shown the moment the app opens.
+  //   world   ListenBrainz, an open record of what its listeners played: the week's most played songs and albums
+  //           across all music. Names only; a song plays where a source has it. Covers come from the Cover Art
+  //           Archive, and an album's tracks from MusicBrainz.
+  //   audius  what is trending there this week and of all time. These play in full.
+  // Apple's and Deezer's charts send no CORS header to any page, so they cannot be read here.
+  // Each chart keeps its last answer, so the next visit draws at once and then refreshes.
+  const kept = (key, fetchRows, make) => ({
+    make,
+    now: () => { try { return JSON.parse(localStorage.getItem(`holoplay.chart.${key}`)) || []; } catch { return []; } },
+    fresh: async () => { const rows = await fetchRows(); try { localStorage.setItem(`holoplay.chart.${key}`, JSON.stringify(rows)); } catch { /* a convenience */ } return rows; },
+  });
+  const LB = 'https://api.listenbrainz.org/1/stats/sitewide';
+  const coverOf = (release) => (pixels) => Promise.resolve(release ? `https://coverartarchive.org/release/${release}/front-${pixels > 300 ? 500 : 250}` : '');
+  const worldSong = (r) => ({
+    id: `chart:${r.id}`, source: 'chart', title: r.title, artist: r.artist, album: r.album || '', duration: r.seconds || 0, track: r.track || null,
+    cover: coverOf(r.release), thumb: r.release ? `https://coverartarchive.org/release/${r.release}/front-250` : '', kappa: '', preview: '', reps: [], unresolved: true,
+  });
+  const worldAlbum = (r) => ({
+    id: `chart-album:${r.id}`, source: 'chart', kind: 'Album', name: r.title, artist: r.artist, year: null, genre: '',
+    cover: coverOf(r.release),
+    songs: async () => {
+      const found = await json(`https://musicbrainz.org/ws/2/release/${r.release}?inc=recordings&fmt=json`);
+      return (found.media || []).flatMap((disc) => disc.tracks || []).map((t, i) => worldSong({
+        id: (t.recording && t.recording.id) || `${r.release}:${i}`, title: t.title, artist: r.artist, album: r.title, release: r.release, seconds: Math.round((t.length || 0) / 1000), track: i + 1 }));
+    },
+  });
+  const spread = (rows, each) => { // a chart is truthful, but a shelf of one artist is dull: at most two entries each
+    const seen = new Map();
+    return rows.filter((row) => { const n = (seen.get(row.artist) || 0) + 1; seen.set(row.artist, n); return n <= each; });
+  };
+  const slim = (t) => ({ id: t.id, title: t.title, user: { name: t.user && t.user.name }, duration: t.duration, genre: t.genre, artwork: t.artwork, is_streamable: true });
+  const charts = {
+    trending: kept('trending', async () => ((await json(`${AU}/tracks/trending?time=week&limit=18&${APP}`)).data || []).filter(playable).slice(0, 12).map(slim), open),
+    classics: kept('classics', async () => ((await json(`${AU}/tracks/trending?time=allTime&limit=18&${APP}`)).data || []).filter(playable).slice(0, 12).map(slim), open),
+    songs: kept('songs', async () => spread((((await json(`${LB}/recordings?range=week&count=60`)).payload || {}).recordings || [])
+      .map((r) => ({ id: r.recording_mbid || `${r.artist_name}:${r.track_name}`, title: r.track_name, artist: r.artist_name, album: r.release_name, release: r.caa_release_mbid || r.release_mbid || '' })), 2).slice(0, 12), worldSong),
+    albums: kept('albums', async () => {
+      const seen = new Set();
+      return spread((((await json(`${LB}/release-groups?range=week&count=60`)).payload || {}).release_groups || [])
+        .filter((r) => r.caa_release_mbid && !seen.has(r.release_group_mbid) && seen.add(r.release_group_mbid))
+        .map((r) => ({ id: r.release_group_mbid, title: r.release_group_name, artist: r.artist_name, release: r.caa_release_mbid })), 2).slice(0, 12);
+    }, worldAlbum),
+  };
+
+  globalThis.HoloSources = { catalogue, audius, companion, preview, radio, soma, podcasts, big, charts };
 })();

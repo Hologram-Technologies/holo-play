@@ -243,3 +243,34 @@ that is a known weakness.
 Not tested: any step above the screen's own pixels, an 8K or 4K display, whether float colour was in use, the
 attention rule's effect by eye, attack and noisiness against a known signal, and everything listed as untested in
 the section above.
+
+## Animation switch, 2026-11-26
+
+An eye button in the visual view switches the animation off and on; the choice is kept. Off shows the cover and
+draws nothing. Seen in the holospace: off showed the cover with the crossed eye, on resumed the picture. `verify`
+exit 0, 44 theorems, 96 vectors. Not seen: the choice surviving a reload, and the final tooltip wording.
+
+## Live charts on the home screen, 2026-11-26
+
+Sources tested with the headers a sandboxed page sends (`Origin: null`):
+
+| Source | Result |
+| --- | --- |
+| ListenBrainz sitewide recordings, release groups, artists (week) | open CORS, used |
+| Audius trending by week, month, all time and genre; trending playlists | open CORS, used |
+| MusicBrainz release lookup | open CORS, used for an album's tracks |
+| Hype Machine popular | open CORS, not used |
+| Apple most-played charts (`rss.marketingtools.apple.com`) | no CORS header for any origin, unusable |
+| Deezer chart | no CORS header, unusable |
+| TheAudioDB | no artwork for the albums tried, not used |
+| Wikipedia and Wikidata | answered 429 to this machine, not established |
+
+Seen in the holospace: two seconds after opening, Trending now and Top songs this week were already drawn from
+the last visit. Top songs this week, Top albums this week and All-time favourites all filled. The Verified
+originals shelf is gone from the home screen. `verify` exit 0, 44 theorems, 96 vectors.
+
+Known gap: chart covers come from the Cover Art Archive, which is kept on archive.org. That host is unreachable
+from this machine, so every chart tile here showed its icon instead of a cover. No second artwork source was found.
+
+Not tested: playing a chart song (the match on Audius, and the fall to search when nothing has it), opening a
+chart album and its MusicBrainz track list, and the first visit with nothing remembered.

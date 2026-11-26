@@ -93,7 +93,12 @@ anything else                                      -> invalid request
 - The commercial catalogue (the iTunes Search API: every released song, with a 30-second preview) is wired in but
   does not answer in a holospace. See "Searching any song" below.
 
-- A verified library: the three Hologram CC0 albums. Each track is fetched, its SHA-256 is re-derived, and it plays
+- Charts on the home screen, drawn at once from the last visit and then refreshed: what is trending on Audius this
+  week and of all time (these play in full), and the week's most played songs and albums across all music from
+  ListenBrainz. A chart song plays where a source has it; otherwise the app says so and shows what can be played.
+  Covers come from the Cover Art Archive, which is kept on archive.org. Apple's and Deezer's charts send no CORS
+  header to any page, so they cannot be read.
+- A verified library, no longer shown on the home screen at the owner's request: the three Hologram CC0 albums. Each track is fetched, its SHA-256 is re-derived, and it plays
   only if that matches the address in the library's catalogue. A mismatch is refused.
 - The Holo Audio Engine, ported unchanged: five-band EQ, bass and air shelves, crossfeed, a speaker stage for
   headphones, a limiter and a live output meter. Nine presets. On by default.
