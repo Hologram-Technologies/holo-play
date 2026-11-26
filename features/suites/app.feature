@@ -58,6 +58,48 @@ Feature: app
     Then the statement holds for every request
     And prism-code build replays the request picks 000000 000001 000001, an open source and a preview with no companion, answered open
 
+  @VZ-01 @build
+  Scenario: The picture reacts only while the item plays through the engine and its samples are arriving; an item the page cannot read is never drawn as sound
+    Given the model in app/src/App.lex.tex
+    When prism-code check has Lean's kernel prove App.direct_is_never_drawn_as_sound, App.react_needs_live_samples
+    Then the statement holds for every request
+    And prism-code build replays the request shows 000000 000001 000001, a direct item, answered still
+
+  @VZ-02 @build
+  Scenario: A flash is allowed only while fewer than three happened in the last second, and never when calm is asked for
+    Given the model in app/src/App.lex.tex
+    When prism-code check has Lean's kernel prove App.at_most_three_flashes_a_second, App.calm_never_flashes
+    Then the statement holds for every request
+    And prism-code build replays the request flash 000003 000000, three flashes already this second, answered damp
+
+  @VZ-03 @build
+  Scenario: A scene is kept for at least eight seconds and left by forty-five, never changes while locked, cuts only on a beat, and never cuts when calm is asked for
+    Given the model in app/src/App.lex.tex
+    When prism-code check has Lean's kernel prove App.scene_keeps_its_minimum, App.scene_ends_by_its_maximum, App.locked_scene_stays, App.cut_lands_on_a_beat, App.calm_never_cuts
+    Then the statement holds for every request
+    And prism-code build replays the request scene 000020 000000 000001 000000, a section change off the beat, answered blend
+
+  @VZ-04 @build
+  Scenario: The detail step stays between zero and five, never rises while frames are slow, and holds inside the band between fourteen and twenty-two milliseconds
+    Given the model in app/src/App.lex.tex
+    When prism-code check has Lean's kernel prove App.detail_stays_in_range, App.detail_never_rises_when_slow, App.detail_holds_in_the_band
+    Then the statement holds for every request
+    And prism-code build replays the request depth 000005 000040, the top step at forty milliseconds a frame, answered scale 000004
+
+  @VZ-05 @build
+  Scenario: The mood is one of four steps, calm when the sound is quiet, and never calmer for more energy or a faster tempo
+    Given the model in app/src/App.lex.tex
+    When prism-code check has Lean's kernel prove App.mood_stays_in_range, App.quiet_is_calm, App.more_energy_is_never_calmer, App.faster_is_never_calmer
+    Then the statement holds for every request
+    And prism-code build replays the request moods 000060 000150, a strong passage at 150 beats a minute, answered mood 000003
+
+  @VZ-06 @build
+  Scenario: The picture leans toward one of bass, mid and treble, keeps it unless another is clearly stronger, and moves only to the strongest
+    Given the model in app/src/App.lex.tex
+    When prism-code check has Lean's kernel prove App.attention_stays_in_range, App.attention_holds_unless_clearly_beaten, App.attention_moves_to_the_strongest
+    Then the statement holds for every request
+    And prism-code build replays the request heeds 000000 000050 000060 000030, bass held with mid ten ahead, answered heed 000000
+
   @HP-08 @build @rejects
   Scenario: A request is accepted only at one of the four lengths a request has; any other request is answered invalid request
     Given the model in app/src/App.lex.tex

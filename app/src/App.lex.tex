@@ -522,6 +522,369 @@ theorem{
   axioms: [Quot.sound, propext]
 }
 
+definition{name: showStill, parameters: [], result: Nat, body: 0}
+
+definition{name: showReact, parameters: [], result: Nat, body: 1}
+
+definition{name: showRest, parameters: [], result: Nat, body: 2}
+
+definition{
+  name: show,
+  parameters: [path : Nat, samples : Nat, playing : Nat],
+  result: Nat,
+  body: (if (not (path =? 1)) then (showStill) else (if ((playing =? 1) && (samples =? 1)) then (showReact) else (showRest)))
+}
+
+definition{
+  name: breaksShowDirect,
+  parameters: [path : Nat, samples : Nat, playing : Nat],
+  result: Bool,
+  body: ((not (path =? 1)) && (not ((show path samples playing) =? (showStill))))
+}
+
+theorem{
+  name: direct_is_never_drawn_as_sound,
+  parameters: [path : Nat, samples : Nat, playing : Nat],
+  statement: ((breaksShowDirect path samples playing) = false),
+  proof: linear_arithmetic{definitions: [breaksShowDirect, show, showReact, showRest, showStill]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksShowReact,
+  parameters: [path : Nat, samples : Nat, playing : Nat],
+  result: Bool,
+  body: (((show path samples playing) =? (showReact)) && (not ((samples =? 1) && (playing =? 1))))
+}
+
+theorem{
+  name: react_needs_live_samples,
+  parameters: [path : Nat, samples : Nat, playing : Nat],
+  statement: ((breaksShowReact path samples playing) = false),
+  proof: linear_arithmetic{definitions: [breaksShowReact, show, showReact, showRest, showStill]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{name: flashDamp, parameters: [], result: Nat, body: 0}
+
+definition{name: flashAllow, parameters: [], result: Nat, body: 1}
+
+definition{
+  name: flash,
+  parameters: [count : Nat, calm : Nat],
+  result: Nat,
+  body: (if (calm =? 1) then (flashDamp) else (if (count <? 3) then (flashAllow) else (flashDamp)))
+}
+
+definition{
+  name: breaksFlashCount,
+  parameters: [count : Nat, calm : Nat],
+  result: Bool,
+  body: (((flash count calm) =? (flashAllow)) && (not (count <? 3)))
+}
+
+theorem{
+  name: at_most_three_flashes_a_second,
+  parameters: [count : Nat, calm : Nat],
+  statement: ((breaksFlashCount count calm) = false),
+  proof: linear_arithmetic{definitions: [breaksFlashCount, flash, flashAllow, flashDamp]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksFlashCalm,
+  parameters: [count : Nat, calm : Nat],
+  result: Bool,
+  body: ((calm =? 1) && ((flash count calm) =? (flashAllow)))
+}
+
+theorem{
+  name: calm_never_flashes,
+  parameters: [count : Nat, calm : Nat],
+  statement: ((breaksFlashCalm count calm) = false),
+  proof: linear_arithmetic{definitions: [breaksFlashCalm, flash, flashAllow, flashDamp]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{name: sceneStay, parameters: [], result: Nat, body: 0}
+
+definition{name: sceneBlend, parameters: [], result: Nat, body: 1}
+
+definition{name: sceneCut, parameters: [], result: Nat, body: 2}
+
+definition{
+  name: scene,
+  parameters: [seconds : Nat, beat : Nat, boundary : Nat, hold : Nat],
+  result: Nat,
+  body: (if (hold =? 1) then (sceneStay) else (if (seconds <? 8) then (sceneStay) else (if (45 <=? seconds) then (if ((beat =? 1) && (not (hold =? 2))) then (sceneCut) else (sceneBlend)) else (if (boundary =? 1) then (if ((beat =? 1) && (not (hold =? 2))) then (sceneCut) else (sceneBlend)) else (sceneStay)))))
+}
+
+definition{
+  name: breaksSceneMinimum,
+  parameters: [seconds : Nat, beat : Nat, boundary : Nat, hold : Nat],
+  result: Bool,
+  body: ((seconds <? 8) && (not ((scene seconds beat boundary hold) =? (sceneStay))))
+}
+
+theorem{
+  name: scene_keeps_its_minimum,
+  parameters: [seconds : Nat, beat : Nat, boundary : Nat, hold : Nat],
+  statement: ((breaksSceneMinimum seconds beat boundary hold) = false),
+  proof: linear_arithmetic{definitions: [breaksSceneMinimum, scene, sceneBlend, sceneCut, sceneStay]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksSceneMaximum,
+  parameters: [seconds : Nat, beat : Nat, boundary : Nat, hold : Nat],
+  result: Bool,
+  body: (((45 <=? seconds) && (not (hold =? 1))) && ((scene seconds beat boundary hold) =? (sceneStay)))
+}
+
+theorem{
+  name: scene_ends_by_its_maximum,
+  parameters: [seconds : Nat, beat : Nat, boundary : Nat, hold : Nat],
+  statement: ((breaksSceneMaximum seconds beat boundary hold) = false),
+  proof: linear_arithmetic{definitions: [breaksSceneMaximum, scene, sceneBlend, sceneCut, sceneStay]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksSceneLocked,
+  parameters: [seconds : Nat, beat : Nat, boundary : Nat, hold : Nat],
+  result: Bool,
+  body: ((hold =? 1) && (not ((scene seconds beat boundary hold) =? (sceneStay))))
+}
+
+theorem{
+  name: locked_scene_stays,
+  parameters: [seconds : Nat, beat : Nat, boundary : Nat, hold : Nat],
+  statement: ((breaksSceneLocked seconds beat boundary hold) = false),
+  proof: linear_arithmetic{definitions: [breaksSceneLocked, scene, sceneBlend, sceneCut, sceneStay]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksSceneBeat,
+  parameters: [seconds : Nat, beat : Nat, boundary : Nat, hold : Nat],
+  result: Bool,
+  body: (((scene seconds beat boundary hold) =? (sceneCut)) && (not (beat =? 1)))
+}
+
+theorem{
+  name: cut_lands_on_a_beat,
+  parameters: [seconds : Nat, beat : Nat, boundary : Nat, hold : Nat],
+  statement: ((breaksSceneBeat seconds beat boundary hold) = false),
+  proof: linear_arithmetic{definitions: [breaksSceneBeat, scene, sceneBlend, sceneCut, sceneStay]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksSceneCalm,
+  parameters: [seconds : Nat, beat : Nat, boundary : Nat, hold : Nat],
+  result: Bool,
+  body: ((hold =? 2) && ((scene seconds beat boundary hold) =? (sceneCut)))
+}
+
+theorem{
+  name: calm_never_cuts,
+  parameters: [seconds : Nat, beat : Nat, boundary : Nat, hold : Nat],
+  statement: ((breaksSceneCalm seconds beat boundary hold) = false),
+  proof: linear_arithmetic{definitions: [breaksSceneCalm, scene, sceneBlend, sceneCut, sceneStay]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: detail,
+  parameters: [step : Nat, millis : Nat],
+  result: Nat,
+  body: (if (22 <? millis) then (prim subtract (if (step <? 5) then step else 5) 1 : Nat) else (if ((millis <? 14) && (step <? 5)) then (step + 1) else (if (step <? 5) then step else 5)))
+}
+
+definition{
+  name: breaksDetailRange,
+  parameters: [step : Nat, millis : Nat],
+  result: Bool,
+  body: (not ((detail step millis) <=? 5))
+}
+
+theorem{
+  name: detail_stays_in_range,
+  parameters: [step : Nat, millis : Nat],
+  statement: ((breaksDetailRange step millis) = false),
+  proof: linear_arithmetic{definitions: [breaksDetailRange, detail]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksDetailSlow,
+  parameters: [step : Nat, millis : Nat],
+  result: Bool,
+  body: (((22 <? millis) && (step <=? 5)) && (step <? (detail step millis)))
+}
+
+theorem{
+  name: detail_never_rises_when_slow,
+  parameters: [step : Nat, millis : Nat],
+  statement: ((breaksDetailSlow step millis) = false),
+  proof: linear_arithmetic{definitions: [breaksDetailSlow, detail]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksDetailBand,
+  parameters: [step : Nat, millis : Nat],
+  result: Bool,
+  body: ((((14 <=? millis) && (millis <=? 22)) && (step <=? 5)) && (not ((detail step millis) =? step)))
+}
+
+theorem{
+  name: detail_holds_in_the_band,
+  parameters: [step : Nat, millis : Nat],
+  statement: ((breaksDetailBand step millis) = false),
+  proof: linear_arithmetic{definitions: [breaksDetailBand, detail]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: mood,
+  parameters: [energy : Nat, tempo : Nat],
+  result: Nat,
+  body: (if (energy <? 25) then 0 else (if (energy <? 50) then 1 else (if ((energy <? 75) && (tempo <? 140)) then 2 else 3)))
+}
+
+definition{
+  name: breaksMoodRange,
+  parameters: [energy : Nat, tempo : Nat],
+  result: Bool,
+  body: (not ((mood energy tempo) <=? 3))
+}
+
+theorem{
+  name: mood_stays_in_range,
+  parameters: [energy : Nat, tempo : Nat],
+  statement: ((breaksMoodRange energy tempo) = false),
+  proof: linear_arithmetic{definitions: [breaksMoodRange, mood]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksMoodQuiet,
+  parameters: [energy : Nat, tempo : Nat],
+  result: Bool,
+  body: ((energy <? 25) && (not ((mood energy tempo) =? 0)))
+}
+
+theorem{
+  name: quiet_is_calm,
+  parameters: [energy : Nat, tempo : Nat],
+  statement: ((breaksMoodQuiet energy tempo) = false),
+  proof: linear_arithmetic{definitions: [breaksMoodQuiet, mood]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksMoodEnergy,
+  parameters: [energy : Nat, other : Nat, tempo : Nat],
+  result: Bool,
+  body: ((energy <=? other) && ((mood other tempo) <? (mood energy tempo)))
+}
+
+theorem{
+  name: more_energy_is_never_calmer,
+  parameters: [energy : Nat, other : Nat, tempo : Nat],
+  statement: ((breaksMoodEnergy energy other tempo) = false),
+  proof: linear_arithmetic{definitions: [breaksMoodEnergy, mood]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksMoodTempo,
+  parameters: [energy : Nat, tempo : Nat, other : Nat],
+  result: Bool,
+  body: ((tempo <=? other) && ((mood energy other) <? (mood energy tempo)))
+}
+
+theorem{
+  name: faster_is_never_calmer,
+  parameters: [energy : Nat, tempo : Nat, other : Nat],
+  statement: ((breaksMoodTempo energy tempo other) = false),
+  proof: linear_arithmetic{definitions: [breaksMoodTempo, mood]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{name: heedBass, parameters: [], result: Nat, body: 0}
+
+definition{name: heedMid, parameters: [], result: Nat, body: 1}
+
+definition{name: heedTreble, parameters: [], result: Nat, body: 2}
+
+definition{
+  name: lead,
+  parameters: [bass : Nat, mid : Nat, treble : Nat],
+  result: Nat,
+  body: (if ((mid <=? bass) && (treble <=? bass)) then (heedBass) else (if (treble <=? mid) then (heedMid) else (heedTreble)))
+}
+
+definition{
+  name: weight,
+  parameters: [part : Nat, bass : Nat, mid : Nat, treble : Nat],
+  result: Nat,
+  body: (if (part =? (heedBass)) then bass else (if (part =? (heedMid)) then mid else treble))
+}
+
+definition{
+  name: heed,
+  parameters: [held : Nat, bass : Nat, mid : Nat, treble : Nat],
+  result: Nat,
+  body: (if (((weight held bass mid treble) + 15) <? (weight (lead bass mid treble) bass mid treble)) then (lead bass mid treble) else (if (held <=? 2) then held else (lead bass mid treble)))
+}
+
+definition{
+  name: breaksHeedRange,
+  parameters: [held : Nat, bass : Nat, mid : Nat, treble : Nat],
+  result: Bool,
+  body: (not ((heed held bass mid treble) <=? 2))
+}
+
+theorem{
+  name: attention_stays_in_range,
+  parameters: [held : Nat, bass : Nat, mid : Nat, treble : Nat],
+  statement: ((breaksHeedRange held bass mid treble) = false),
+  proof: linear_arithmetic{definitions: [breaksHeedRange, heed, heedBass, heedMid, heedTreble, lead, weight]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksHeedHold,
+  parameters: [held : Nat, bass : Nat, mid : Nat, treble : Nat],
+  result: Bool,
+  body: ((((held <=? 2) && (bass <=? ((weight held bass mid treble) + 15))) && ((mid <=? ((weight held bass mid treble) + 15)) && (treble <=? ((weight held bass mid treble) + 15)))) && (not ((heed held bass mid treble) =? held)))
+}
+
+theorem{
+  name: attention_holds_unless_clearly_beaten,
+  parameters: [held : Nat, bass : Nat, mid : Nat, treble : Nat],
+  statement: ((breaksHeedHold held bass mid treble) = false),
+  proof: linear_arithmetic{definitions: [breaksHeedHold, heed, heedBass, heedMid, heedTreble, lead, weight]},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: breaksHeedMove,
+  parameters: [held : Nat, bass : Nat, mid : Nat, treble : Nat],
+  result: Bool,
+  body: ((not ((heed held bass mid treble) =? held)) && ((((weight (heed held bass mid treble) bass mid treble) <? bass) || ((weight (heed held bass mid treble) bass mid treble) <? mid)) || ((weight (heed held bass mid treble) bass mid treble) <? treble)))
+}
+
+theorem{
+  name: attention_moves_to_the_strongest,
+  parameters: [held : Nat, bass : Nat, mid : Nat, treble : Nat],
+  statement: ((breaksHeedMove held bass mid treble) = false),
+  proof: linear_arithmetic{definitions: [breaksHeedMove, heed, heedBass, heedMid, heedTreble, lead, weight]},
+  axioms: [Quot.sound, propext]
+}
+
 definition{
   name: accepts,
   parameters: [length : Nat],
@@ -767,6 +1130,102 @@ definition{
   axioms: [Quot.sound, propext]
 }
 
+definition{
+  name: saysShows,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 115) && (((codeAt value 1) =? 104) && (((codeAt value 2) =? 111) && (((codeAt value 3) =? 119) && (((codeAt value 4) =? 115) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: showsRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 26) && ((saysShows value) && ((fieldOk value 6) && ((fieldOk value 13) && (lastFieldOk value 20))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysFlash,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 102) && (((codeAt value 1) =? 108) && (((codeAt value 2) =? 97) && (((codeAt value 3) =? 115) && (((codeAt value 4) =? 104) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: flashRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 19) && ((saysFlash value) && ((fieldOk value 6) && (lastFieldOk value 13)))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysScene,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 115) && (((codeAt value 1) =? 99) && (((codeAt value 2) =? 101) && (((codeAt value 3) =? 110) && (((codeAt value 4) =? 101) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: sceneRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 33) && ((saysScene value) && ((fieldOk value 6) && ((fieldOk value 13) && ((fieldOk value 20) && (lastFieldOk value 27)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysDepth,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 100) && (((codeAt value 1) =? 101) && (((codeAt value 2) =? 112) && (((codeAt value 3) =? 116) && (((codeAt value 4) =? 104) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: depthRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 19) && ((saysDepth value) && ((fieldOk value 6) && (lastFieldOk value 13)))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysMoods,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 109) && (((codeAt value 1) =? 111) && (((codeAt value 2) =? 111) && (((codeAt value 3) =? 100) && (((codeAt value 4) =? 115) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: moodsRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 19) && ((saysMoods value) && ((fieldOk value 6) && (lastFieldOk value 13)))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: saysHeeds,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((codeAt value 0) =? 104) && (((codeAt value 1) =? 101) && (((codeAt value 2) =? 101) && (((codeAt value 3) =? 100) && (((codeAt value 4) =? 115) && ((codeAt value 5) =? 32)))))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: heedsRequest,
+  parameters: [value : Bytes],
+  result: Bool,
+  body: (((Foundation.Bytes::byteLength value) =? 33) && ((saysHeeds value) && ((fieldOk value 6) && ((fieldOk value 13) && ((fieldOk value 20) && (lastFieldOk value 27)))))),
+  axioms: [Quot.sound, propext]
+}
+
 definition{name: digitGlyphs, parameters: [], result: Bytes, body: (prim utf8_encode "0123456789" : Bytes)}
 
 definition{
@@ -860,10 +1319,34 @@ definition{
 }
 
 definition{
+  name: showText,
+  parameters: [answer : Nat],
+  result: Bytes,
+  body: (if (answer =? (showReact)) then (prim utf8_encode "react" : Bytes) else (if (answer =? (showRest)) then (prim utf8_encode "rest" : Bytes) else (prim utf8_encode "still" : Bytes))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: flashText,
+  parameters: [answer : Nat],
+  result: Bytes,
+  body: (if (answer =? (flashAllow)) then (prim utf8_encode "allow" : Bytes) else (prim utf8_encode "damp" : Bytes)),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: sceneText,
+  parameters: [answer : Nat],
+  result: Bytes,
+  body: (if (answer =? (sceneCut)) then (prim utf8_encode "cut" : Bytes) else (if (answer =? (sceneBlend)) then (prim utf8_encode "blend" : Bytes) else (prim utf8_encode "stay" : Bytes))),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
   name: dispatch,
   parameters: [value : Bytes],
   result: Bytes,
-  body: (if (accepts (Foundation.Bytes::byteLength value)) then (if (ranksRequest value) then (rankText (rank (field value 6) (field value 13) (field value 20) (field value 27) (field value 34) (field value 41))) else (if (retryRequest value) then (retryText (retry (field value 6) (field value 13))) else (if (routeRequest value) then (routeText (route (field value 6) (field value 13))) else (if (aheadRequest value) then (moveText (aheadMove (field value 6) (field value 13) (field value 20) (field value 27)) (aheadIndex (field value 6) (field value 13) (field value 20) (field value 27))) else (if (priorRequest value) then (moveText (priorMove (field value 6) (field value 13)) (priorIndex (field value 6) (field value 13))) else (if (stripRequest value) then (moveText (stripMove (field value 6) (field value 13) (field value 20)) (stripIndex (field value 6) (field value 13) (field value 20))) else (if (linksRequest value) then (linkText (link (field value 6) (field value 13) (field value 20))) else (if (offerRequest value) then (offerText (offer (field value 6) (field value 13))) else (if (seeksRequest value) then (seekText (seeks (field value 6) (field value 13))) else (if (picksRequest value) then (pickText (pick (field value 6) (field value 13) (field value 20))) else (prim utf8_encode "invalid request" : Bytes))))))))))) else (prim utf8_encode "invalid request" : Bytes)),
+  body: (if (accepts (Foundation.Bytes::byteLength value)) then (if (ranksRequest value) then (rankText (rank (field value 6) (field value 13) (field value 20) (field value 27) (field value 34) (field value 41))) else (if (retryRequest value) then (retryText (retry (field value 6) (field value 13))) else (if (routeRequest value) then (routeText (route (field value 6) (field value 13))) else (if (aheadRequest value) then (moveText (aheadMove (field value 6) (field value 13) (field value 20) (field value 27)) (aheadIndex (field value 6) (field value 13) (field value 20) (field value 27))) else (if (priorRequest value) then (moveText (priorMove (field value 6) (field value 13)) (priorIndex (field value 6) (field value 13))) else (if (stripRequest value) then (moveText (stripMove (field value 6) (field value 13) (field value 20)) (stripIndex (field value 6) (field value 13) (field value 20))) else (if (linksRequest value) then (linkText (link (field value 6) (field value 13) (field value 20))) else (if (offerRequest value) then (offerText (offer (field value 6) (field value 13))) else (if (seeksRequest value) then (seekText (seeks (field value 6) (field value 13))) else (if (picksRequest value) then (pickText (pick (field value 6) (field value 13) (field value 20))) else (if (showsRequest value) then (showText (show (field value 6) (field value 13) (field value 20))) else (if (flashRequest value) then (flashText (flash (field value 6) (field value 13))) else (if (sceneRequest value) then (sceneText (scene (field value 6) (field value 13) (field value 20) (field value 27))) else (if (depthRequest value) then (numbered (prim utf8_encode "scale " : Bytes) (detail (field value 6) (field value 13))) else (if (moodsRequest value) then (numbered (prim utf8_encode "mood " : Bytes) (mood (field value 6) (field value 13))) else (if (heedsRequest value) then (numbered (prim utf8_encode "heed " : Bytes) (heed (field value 6) (field value 13) (field value 20) (field value 27))) else (prim utf8_encode "invalid request" : Bytes))))))))))))))))) else (prim utf8_encode "invalid request" : Bytes)),
   axioms: [Quot.sound, propext]
 }
 
@@ -871,7 +1354,7 @@ definition{
   name: application,
   parameters: [],
   result: Foundation.View.Text.V1.Model::TextApplication,
-  body: (record Foundation.View.Text.V1.Model::TextApplication {profile := "prismpm/text-application/1", name := "Holo Play", cargoName := "prism-holo-play", cargoVersion := "0.1.0", cargoDescription := "Music, radio, podcasts and audiobooks in one player, with its playback decisions proved.", cargoRepository := "https://github.com/Hologram-Technologies/holo-play", cargoHomepage := "https://github.com/Hologram-Technologies/holo-play", libraryRoots := (cons "PrismHoloPlay.App.dispatch" (nil String)), acceptanceVectors := (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000002 000016 000900 000001 000000 000320" : Bytes), response := (prim utf8_encode "first" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 000320 000002 000016 000000" : Bytes), response := (prim utf8_encode "second" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000002 000024 000000 000002 000016 000000" : Bytes), response := (prim utf8_encode "first" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 000128 000001 000000 000320" : Bytes), response := (prim utf8_encode "second" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 000320 000001 000000 000320" : Bytes), response := (prim utf8_encode "tie" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 999999 000002 000000 000000" : Bytes), response := (prim utf8_encode "second" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000000 000002" : Bytes), response := (prim utf8_encode "advance" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000001 000002" : Bytes), response := (prim utf8_encode "advance" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000002 000002" : Bytes), response := (prim utf8_encode "exhausted" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000000 000000" : Bytes), response := (prim utf8_encode "exhausted" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000001 000001" : Bytes), response := (prim utf8_encode "engine" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000000 000001" : Bytes), response := (prim utf8_encode "direct" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000001 000000" : Bytes), response := (prim utf8_encode "direct" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000002 000001" : Bytes), response := (prim utf8_encode "direct" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000000 000003 000000 000001" : Bytes), response := (prim utf8_encode "play 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000002 000003 000000 000001" : Bytes), response := (prim utf8_encode "stop" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000002 000003 000001 000001" : Bytes), response := (prim utf8_encode "play 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000001 000003 000002 000001" : Bytes), response := (prim utf8_encode "replay" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000001 000003 000002 000000" : Bytes), response := (prim utf8_encode "play 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000000 000000 000001 000000" : Bytes), response := (prim utf8_encode "stop" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000000 000001 000001 000001" : Bytes), response := (prim utf8_encode "play 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000002 000001" : Bytes), response := (prim utf8_encode "play 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000002 000004" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000000 000000" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000001 000003" : Bytes), response := (prim utf8_encode "play 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000002 000005 000000" : Bytes), response := (prim utf8_encode "keep 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000002 000005 000002" : Bytes), response := (prim utf8_encode "play 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000004 000005 000004" : Bytes), response := (prim utf8_encode "play 000003" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000001 000005 000003" : Bytes), response := (prim utf8_encode "keep 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000000 000001 000000" : Bytes), response := (prim utf8_encode "empty" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000001 000000 000000" : Bytes), response := (prim utf8_encode "track" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000002 000000 000000" : Bytes), response := (prim utf8_encode "stream" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000001 000000" : Bytes), response := (prim utf8_encode "album" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000003 000001" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000003 000000" : Bytes), response := (prim utf8_encode "external" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000002 000001" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000000 000001" : Bytes), response := (prim utf8_encode "import" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000000 000000" : Bytes), response := (prim utf8_encode "external" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "offer 000000 000000" : Bytes), response := (prim utf8_encode "offer" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "offer 000001 000000" : Bytes), response := (prim utf8_encode "hide" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "offer 000001 000001" : Bytes), response := (prim utf8_encode "offer" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 000000 003600" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 000004 003600" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 001200 003600" : Bytes), response := (prim utf8_encode "resume" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 003570 003600" : Bytes), response := (prim utf8_encode "finished" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 003569 003600" : Bytes), response := (prim utf8_encode "resume" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 000050 000060" : Bytes), response := (prim utf8_encode "finished" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000001 000001 000001" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000000 000001 000001" : Bytes), response := (prim utf8_encode "open" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000000 000000 000001" : Bytes), response := (prim utf8_encode "preview" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000000 000000 000000" : Bytes), response := (prim utf8_encode "none" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000001 000000 000000" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 2 16 900 1 0 320" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000001 00000x" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "skips 000001 000002" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000001_000001" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "play something" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (nil Foundation.View.Text.V1.Model::AcceptanceVector))))))))))))))))))))))))))))))))))))))))))))))))))))))))))), entryRoot := "PrismHoloPlay.App.dispatch", coreContract := "hologram:guest/core-wasm@1", requestMaximum := (64 : UInt32), responseMaximum := (128 : UInt32), guestAllocationMaximum := (256 : UInt32), capabilitiesEmpty := true, fatArchive := true, primaryLayer := (0 : UInt8), viewLayer := (1 : UInt8), view := (record Foundation.View.Text.V1.Model::TextView {title := "Holo Play", heading := "Holo Play", inputLabel := "Request", submitLabel := "Send", outputLabel := "Response", inputError := "Invalid request", responseError := "Invalid response"})})
+  body: (record Foundation.View.Text.V1.Model::TextApplication {profile := "prismpm/text-application/1", name := "Holo Play", cargoName := "prism-holo-play", cargoVersion := "0.1.0", cargoDescription := "Music, radio, podcasts and audiobooks in one player, with its playback decisions proved.", cargoRepository := "https://github.com/Hologram-Technologies/holo-play", cargoHomepage := "https://github.com/Hologram-Technologies/holo-play", libraryRoots := (cons "PrismHoloPlay.App.dispatch" (nil String)), acceptanceVectors := (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000002 000016 000900 000001 000000 000320" : Bytes), response := (prim utf8_encode "first" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 000320 000002 000016 000000" : Bytes), response := (prim utf8_encode "second" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000002 000024 000000 000002 000016 000000" : Bytes), response := (prim utf8_encode "first" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 000128 000001 000000 000320" : Bytes), response := (prim utf8_encode "second" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 000320 000001 000000 000320" : Bytes), response := (prim utf8_encode "tie" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 000001 000000 999999 000002 000000 000000" : Bytes), response := (prim utf8_encode "second" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000000 000002" : Bytes), response := (prim utf8_encode "advance" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000001 000002" : Bytes), response := (prim utf8_encode "advance" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000002 000002" : Bytes), response := (prim utf8_encode "exhausted" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000000 000000" : Bytes), response := (prim utf8_encode "exhausted" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000001 000001" : Bytes), response := (prim utf8_encode "engine" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000000 000001" : Bytes), response := (prim utf8_encode "direct" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000001 000000" : Bytes), response := (prim utf8_encode "direct" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000002 000001" : Bytes), response := (prim utf8_encode "direct" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000000 000003 000000 000001" : Bytes), response := (prim utf8_encode "play 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000002 000003 000000 000001" : Bytes), response := (prim utf8_encode "stop" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000002 000003 000001 000001" : Bytes), response := (prim utf8_encode "play 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000001 000003 000002 000001" : Bytes), response := (prim utf8_encode "replay" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000001 000003 000002 000000" : Bytes), response := (prim utf8_encode "play 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000000 000000 000001 000000" : Bytes), response := (prim utf8_encode "stop" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ahead 000000 000001 000001 000001" : Bytes), response := (prim utf8_encode "play 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000002 000001" : Bytes), response := (prim utf8_encode "play 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000002 000004" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000000 000000" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "prior 000001 000003" : Bytes), response := (prim utf8_encode "play 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000002 000005 000000" : Bytes), response := (prim utf8_encode "keep 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000002 000005 000002" : Bytes), response := (prim utf8_encode "play 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000004 000005 000004" : Bytes), response := (prim utf8_encode "play 000003" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000001 000005 000003" : Bytes), response := (prim utf8_encode "keep 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "strip 000000 000001 000000" : Bytes), response := (prim utf8_encode "empty" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000001 000000 000000" : Bytes), response := (prim utf8_encode "track" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000002 000000 000000" : Bytes), response := (prim utf8_encode "stream" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000001 000000" : Bytes), response := (prim utf8_encode "album" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000003 000001" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000003 000000" : Bytes), response := (prim utf8_encode "external" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000002 000001" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000000 000001" : Bytes), response := (prim utf8_encode "import" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "links 000000 000000 000000" : Bytes), response := (prim utf8_encode "external" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "offer 000000 000000" : Bytes), response := (prim utf8_encode "offer" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "offer 000001 000000" : Bytes), response := (prim utf8_encode "hide" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "offer 000001 000001" : Bytes), response := (prim utf8_encode "offer" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 000000 003600" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 000004 003600" : Bytes), response := (prim utf8_encode "restart" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 001200 003600" : Bytes), response := (prim utf8_encode "resume" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 003570 003600" : Bytes), response := (prim utf8_encode "finished" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 003569 003600" : Bytes), response := (prim utf8_encode "resume" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "seeks 000050 000060" : Bytes), response := (prim utf8_encode "finished" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000001 000001 000001" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000000 000001 000001" : Bytes), response := (prim utf8_encode "open" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000000 000000 000001" : Bytes), response := (prim utf8_encode "preview" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000000 000000 000000" : Bytes), response := (prim utf8_encode "none" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "picks 000001 000000 000000" : Bytes), response := (prim utf8_encode "companion" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "shows 000001 000001 000001" : Bytes), response := (prim utf8_encode "react" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "shows 000000 000001 000001" : Bytes), response := (prim utf8_encode "still" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "shows 000001 000000 000001" : Bytes), response := (prim utf8_encode "rest" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "shows 000001 000001 000000" : Bytes), response := (prim utf8_encode "rest" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "shows 000000 000000 000000" : Bytes), response := (prim utf8_encode "still" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "flash 000000 000000" : Bytes), response := (prim utf8_encode "allow" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "flash 000002 000000" : Bytes), response := (prim utf8_encode "allow" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "flash 000003 000000" : Bytes), response := (prim utf8_encode "damp" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "flash 000000 000001" : Bytes), response := (prim utf8_encode "damp" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "scene 000003 000001 000001 000000" : Bytes), response := (prim utf8_encode "stay" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "scene 000020 000001 000001 000000" : Bytes), response := (prim utf8_encode "cut" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "scene 000020 000000 000001 000000" : Bytes), response := (prim utf8_encode "blend" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "scene 000020 000001 000000 000000" : Bytes), response := (prim utf8_encode "stay" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "scene 000045 000000 000000 000000" : Bytes), response := (prim utf8_encode "blend" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "scene 000060 000001 000000 000000" : Bytes), response := (prim utf8_encode "cut" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "scene 000060 000001 000001 000001" : Bytes), response := (prim utf8_encode "stay" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "scene 000020 000001 000001 000002" : Bytes), response := (prim utf8_encode "blend" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "depth 000003 000030" : Bytes), response := (prim utf8_encode "scale 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "depth 000000 000030" : Bytes), response := (prim utf8_encode "scale 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "depth 000001 000010" : Bytes), response := (prim utf8_encode "scale 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "depth 000005 000010" : Bytes), response := (prim utf8_encode "scale 000005" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "depth 000004 000010" : Bytes), response := (prim utf8_encode "scale 000005" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "depth 000002 000018" : Bytes), response := (prim utf8_encode "scale 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "depth 000009 000018" : Bytes), response := (prim utf8_encode "scale 000005" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "depth 000005 000040" : Bytes), response := (prim utf8_encode "scale 000004" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "moods 000010 000170" : Bytes), response := (prim utf8_encode "mood 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "moods 000040 000090" : Bytes), response := (prim utf8_encode "mood 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "moods 000060 000120" : Bytes), response := (prim utf8_encode "mood 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "moods 000060 000150" : Bytes), response := (prim utf8_encode "mood 000003" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "moods 000090 000080" : Bytes), response := (prim utf8_encode "mood 000003" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "moods 000024 000000" : Bytes), response := (prim utf8_encode "mood 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "heeds 000000 000050 000040 000030" : Bytes), response := (prim utf8_encode "heed 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "heeds 000000 000050 000060 000030" : Bytes), response := (prim utf8_encode "heed 000000" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "heeds 000000 000050 000066 000030" : Bytes), response := (prim utf8_encode "heed 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "heeds 000001 000090 000080 000030" : Bytes), response := (prim utf8_encode "heed 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "heeds 000002 000010 000010 000010" : Bytes), response := (prim utf8_encode "heed 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "heeds 000009 000010 000040 000020" : Bytes), response := (prim utf8_encode "heed 000001" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "heeds 000001 000020 000020 000060" : Bytes), response := (prim utf8_encode "heed 000002" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "ranks 2 16 900 1 0 320" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "retry 000001 00000x" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "skips 000001 000002" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "route 000001_000001" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (cons (record Foundation.View.Text.V1.Model::AcceptanceVector {request := (prim utf8_encode "play something" : Bytes), response := (prim utf8_encode "invalid request" : Bytes)}) (nil Foundation.View.Text.V1.Model::AcceptanceVector))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))), entryRoot := "PrismHoloPlay.App.dispatch", coreContract := "hologram:guest/core-wasm@1", requestMaximum := (64 : UInt32), responseMaximum := (128 : UInt32), guestAllocationMaximum := (256 : UInt32), capabilitiesEmpty := true, fatArchive := true, primaryLayer := (0 : UInt8), viewLayer := (1 : UInt8), view := (record Foundation.View.Text.V1.Model::TextView {title := "Holo Play", heading := "Holo Play", inputLabel := "Request", submitLabel := "Send", outputLabel := "Response", inputError := "Invalid request", responseError := "Invalid response"})})
 }
 \end{semanticmodule}
 \end{lexlean}

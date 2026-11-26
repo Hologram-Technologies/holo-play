@@ -18,6 +18,7 @@
   <script src="library.js"></script>
   <script src="subsonic.js"></script>
   <script src="sources.js"></script>
+  <script src="visuals.js"></script>
   <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -239,6 +240,7 @@
               <span class="whitespace-nowrap" id="now-quality"></span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
+              <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="See the music" data-tooltip="See the music (V)" id="now-open"><span data-slot="icon" data-icon="sparkles" aria-hidden="true"></span></button>
               <button data-slot="toggle" data-size="sm" type="button" aria-pressed="false" aria-label="Save" data-tooltip="Save" id="fav"><span data-slot="icon" data-icon="heart" aria-hidden="true"></span></button>
               <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Back 15 seconds" data-tooltip="Back 15 seconds" id="skip-back" hidden><span data-slot="icon" data-icon="rotate-ccw" aria-hidden="true"></span></button>
               <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Forward 30 seconds" data-tooltip="Forward 30 seconds" id="skip-on" hidden><span data-slot="icon" data-icon="rotate-cw" aria-hidden="true"></span></button>
@@ -261,6 +263,33 @@
       </section>
     </main>
   </div>
+
+  <section class="fixed inset-0 z-overlay bg-background flex flex-col" id="now" aria-label="Now playing" hidden>
+    <canvas class="absolute inset-0 w-full h-full" id="stage" aria-hidden="true"></canvas>
+    <div class="relative flex items-center justify-between px-6 py-4 transition" id="now-top">
+      <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Close" data-tooltip="Close (Esc)" id="now-close"><span data-slot="icon" data-icon="chevron-down" aria-hidden="true"></span></button>
+      <button data-slot="toggle" data-size="sm" type="button" aria-pressed="false" aria-label="Keep this scene" data-tooltip="Keep this scene" id="now-lock"><span data-slot="icon" data-icon="lock" aria-hidden="true"></span></button>
+    </div>
+    <div class="relative flex-1 min-h-0 flex flex-col items-center justify-center gap-4 px-6" id="now-still" hidden>
+      <div class="flex items-center justify-center overflow-hidden w-xs aspect-square rounded-xl bg-muted shadow-md" id="now-art"></div>
+      <p class="max-w-md text-center text-sm text-muted-foreground">This source does not let the app read its sound, so there is nothing true to draw.</p>
+    </div>
+    <div class="relative flex-1 min-h-0" id="now-space"></div>
+    <div class="relative px-6 py-6 transition" id="now-bottom">
+      <div class="w-full max-w-3xl mx-auto flex items-end justify-between gap-4">
+        <div class="grid grid-cols-1 gap-1 min-w-0">
+          <p class="font-display text-3xl font-semibold tracking-tight truncate" id="now-big-title"></p>
+          <p class="text-muted-foreground truncate" id="now-big-artist"></p>
+          <p class="text-xs text-muted-foreground truncate" id="now-big-line"></p>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Previous" id="now-prev"><span data-slot="icon" data-icon="chevron-left" aria-hidden="true"></span></button>
+          <button data-slot="button" data-variant="brand" data-size="icon" class="rounded-full" type="button" aria-label="Play or pause" id="now-play"><span data-slot="icon" data-icon="play" aria-hidden="true" id="now-play-icon"></span><span data-slot="icon" data-icon="pause" aria-hidden="true" id="now-pause-icon" hidden></span></button>
+          <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Next" id="now-next"><span data-slot="icon" data-icon="chevron-right" aria-hidden="true"></span></button>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <dialog data-slot="sheet" data-side="right" id="sound" aria-labelledby="sound-title">
     <div data-slot="dialog-header">

@@ -153,8 +153,9 @@
     return {
       id: `radio:${s.stationuuid}`, source: 'radio', station: s.stationuuid, title: String(s.name || '').trim() || 'Unnamed station', artist: s.country || 'Radio', album: tags, duration: 0, live: true,
       cover: () => Promise.resolve(secure(s.favicon)), thumb: secure(s.favicon), kappa: '',
-      // A station's own server rarely lets a page read its samples, so it plays direct, exactly as sent.
-      reps: [{ url: s.url_resolved || s.url, type: '', lossless: 1, bits: 0, kbps: s.bitrate || 0, label: [codec, s.bitrate ? `${s.bitrate}k` : ''].filter(Boolean).join(' ') || 'Live stream', unreadable: true }],
+      // The engine is tried first, so a station that lets the page read its samples can be heard through it and
+      // seen. One that refuses plays direct, exactly as sent.
+      reps: [{ url: s.url_resolved || s.url, type: '', lossless: 1, bits: 0, kbps: s.bitrate || 0, label: [codec, s.bitrate ? `${s.bitrate}k` : ''].filter(Boolean).join(' ') || 'Live stream' }],
     };
   };
   const playableStation = (s) => secure(s.url_resolved || s.url) && !s.hls;
@@ -190,8 +191,8 @@
   const episode = (show, art) => (e) => ({
     id: `ep:${e.id}`, source: 'podcast', title: e.title || 'Episode', artist: show, album: String(e.pubdate || '').slice(0, 10), duration: Number(e.duration) || 0, resumable: true,
     cover: () => Promise.resolve(big(art)), art, thumb: '', kappa: '',
-    // The publisher's own file, untouched. It is served through redirects that do not let a page read it.
-    reps: [{ url: e.enclosure, type: e.content_type || 'audio/mpeg', lossless: 1, bits: 0, kbps: 0, label: 'Publisher’s file', unreadable: true }],
+    // The publisher's own file. The engine is tried first; a host that refuses plays it direct, untouched.
+    reps: [{ url: e.enclosure, type: e.content_type || 'audio/mpeg', lossless: 1, bits: 0, kbps: 0, label: 'Publisher’s file' }],
   });
   const showOf = (p) => {
     const art = secure(p.imgURL) || ''; // the publisher's own picture; the directory's copies refuse other sites

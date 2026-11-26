@@ -190,3 +190,56 @@ Not done in Phase 3:
 - Light mode and phone width with real content, and any real phone, Firefox or Safari.
 - Genre shortcuts, speed, skip back, and opening and deleting a playlist were not exercised.
 - Not published. No repository, registry entry or store listing exists yet.
+
+## Seeing the music, 2026-11-26, prism-code 0.11.5
+
+### Gates
+
+| Command | Result |
+| --- | --- |
+| `build` | 41 theorems proved, 87 of 87 vectors passed, 0 design violations |
+| `verify` | exit 0: 41 of 41 theorems, identities verified, 87 of 87 vectors |
+
+### Planted defect
+
+- Defect: in `App.show`, the engine test was removed, so a source the page cannot read could be drawn as sound.
+- Result: `check` exit 1, `contract.theorem-unproved` for VZ-01, `direct_is_never_drawn_as_sound` not proved.
+- Restored: 41 of 41.
+
+### Tested in a browser, in the holospace
+
+| What | Result |
+| --- | --- |
+| The view opens over the app from the player; the picture draws and moves while a track plays through the engine | passed |
+| A wide stereo mix draws as two lines, apart | passed |
+| The scene changed during play, and the colour moved | passed |
+| The title and controls fade while the picture reacts | passed |
+| Bright areas no longer pile up into white (seen before the fix, not after) | passed |
+
+### Not tested
+
+- That a flash and its drum hit arrive together: the picture is not yet delayed by the output latency.
+- `still` for a direct source, `rest` when paused or silent, the lock, touch, the cover laid into the picture,
+  reduced motion, the detail ladder under load, and radio or podcasts now trying the engine first.
+- Whether tempo, key, brightness and width are measured correctly. They are computed from the samples; no known
+  test signal was played to check the numbers.
+- Frame rate, phones, Firefox and Safari. Nothing here was heard by a person: the test pane has no speakers I can use.
+
+## Resolution, attention and more of the sound, 2026-11-26
+
+`build` and `verify`: 44 theorems proved, 96 of 96 vectors, 0 design violations (see the run below this section's
+commit). Added: VZ-06 attention; the detail ladder now has six steps, the top three drawing more pixels than the
+screen has, capped at 7680 by 4320; sixteen-bit float colour where available; attack and noisiness measured from
+the spectrum.
+
+Seen in the holospace: the picture drew and reacted, and the on-screen line read "drawn at 1669 × 573", the test
+pane's own pixel count. About ten seconds later it read "drawn at 668 × 229": the model had stepped the detail down
+to its lowest step because frames in the test pane took longer than 22 ms.
+
+Measured, not asserted: that step-down. Whether it came from the picture's cost or from the pane limiting frames
+was not established. A display that refreshes 30 times a second would be held at the lowest step by this rule;
+that is a known weakness.
+
+Not tested: any step above the screen's own pixels, an 8K or 4K display, whether float colour was in use, the
+attention rule's effect by eye, attack and noisiness against a known signal, and everything listed as untested in
+the section above.

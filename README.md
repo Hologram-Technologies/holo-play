@@ -9,7 +9,7 @@ Status: Phase 3 of 3 (Polish and ship). Published at https://github.com/Hologram
 
 ## What is proved, what is tested, what is neither
 
-**Proved.** The model is `app/src/App.lex.tex`. Lean's kernel proves 25 theorems about it. The claims are registered
+**Proved.** The model is `app/src/App.lex.tex`. Lean's kernel proves 44 theorems about it. The claims are registered
 in `model/ids.toml` and listed in the generated `CONFORMANCE.md`.
 
 | ID | Claim |
@@ -23,8 +23,14 @@ in `model/ids.toml` and listed in the generated `CONFORMANCE.md`.
 | HP-07 | A companion source is offered only when the host reports the companion |
 | HP-08 | Any other request is answered `invalid request` |
 | HP-09 | A song plays from the companion when present, else an open full-length source, else a preview; never a preview while a full source exists |
+| VZ-01 | The picture reacts only while the item plays through the engine and its samples are arriving; a source the page cannot read is never drawn as sound |
+| VZ-02 | A flash is allowed only while fewer than three happened in the last second, and never when calm is asked for |
+| VZ-03 | A scene lasts at least eight seconds and at most forty-five, never changes while locked, and cuts only on a beat |
+| VZ-04 | The detail step stays between zero and five, never rises while frames are slow, and holds inside a band |
+| VZ-05 | The mood is calm when the sound is quiet and never calmer for more energy or a faster tempo |
+| VZ-06 | The picture leans toward one of bass, mid and treble, keeps it unless another is clearly stronger, and moves only to the strongest |
 
-**Tested.** 58 acceptance vectors, replayed by `build` and `verify`. Playback in a browser, recorded in
+**Tested.** 96 acceptance vectors, replayed by `build` and `verify`. Playback in a browser, recorded in
 [docs/VERIFICATION-holo-play.md](docs/VERIFICATION-holo-play.md).
 
 **Neither.** The page (`app/view/`) is authored, not proved. Network sources, how a track sounds, and timings are
@@ -43,10 +49,33 @@ links <extension> <host> <companion>               -> track | stream | album | c
 offer <kind> <companion>                           -> offer | hide
 seeks <position> <duration>                        -> resume | finished | restart
 picks <companion> <open> <preview>                 -> companion | open | preview | none
+shows <engine> <samples> <playing>                 -> react | rest | still
+moods <energy> <tempo>                             -> mood <n>
+scene <seconds> <beat> <boundary> <hold>           -> stay | blend | cut
+flash <count> <calm>                               -> allow | damp
+depth <step> <millis>                              -> scale <n>
+heeds <held> <bass> <mid> <treble>                 -> heed <n>
 anything else                                      -> invalid request
 ```
 
 ## What runs today
+
+- Seeing the music. `app/view/visuals.js` is Holo Play's own picture of the sound, written for this app in WebGL 2;
+  nothing is compiled or fetched. It draws the way MilkDrop and projectM do, each frame the last one warped and
+  dimmed with the waveform laid on top, but it does not run their presets. It is fed from the end of the audio
+  engine, left and right apart, and measures loudness and energy, three bands, brightness, stereo width, key, tempo
+  and section changes. The model decides whether it may react, how hard, when the scene changes, whether a flash is
+  safe and how much detail to draw. A source the page cannot read shows its artwork and says so. The three-a-second
+  flash limit follows WCAG 2.2 success criterion 2.3.1; that standard is cited here, not proved.
+- Resolution. The picture is drawn at every pixel the screen has, in sixteen-bit float colour where the graphics
+  card allows, and the model's detail ladder lets it climb to twice that in each direction while frames stay fast,
+  up to 7680 by 4320 (8K). It steps down when frames are slow. The size actually being drawn is shown on screen.
+  A screen shows no more pixels than it has: 8K on screen needs an 8K display.
+- Verdant Engine (`afflom/verdant-engine`, MIT or Apache-2.0) was studied for this. It is a 3D game engine whose
+  153 KB WebAssembly module is published with open CORS and could be fetched and checked by a holospace page. Its
+  176 exported functions have no entry for outside sound and none for drawing geometry it did not make, so it
+  cannot draw this music today. What was taken from it is an idea, its attention loop: VZ-06 is Holo Play's own
+  proved rule for what the picture attends to. Using the engine itself needs new exports from its author.
 
 - Five sections: Music, Radio, Podcasts, Audiobooks, Saved. One search box covers all of them and accepts a pasted link.
 - Radio: about 50,000 stations from Radio Browser (https streams only), twelve genre shortcuts, and SomaFM channels

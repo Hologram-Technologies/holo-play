@@ -11,6 +11,12 @@
 //   seeks <position> <seconds>                         -> resume | finished | restart         a saved position
 //   links <extension> <host> <companion>               -> track | stream | album | companion | import | external
 //   offer <kind> <companion>                           -> offer | hide                        a companion source
+//   shows <engine> <samples> <playing>                 -> react | rest | still                may the picture react
+//   moods <energy> <tempo>                             -> mood <n>                            how hard the sound may push it
+//   scene <seconds> <beat> <boundary> <hold>           -> stay | blend | cut                  when the scene changes
+//   flash <count> <calm>                               -> allow | damp                        whether a flash is safe
+//   depth <step> <millis>                              -> scale <n>                           how much detail to draw
+//   heeds <held> <bass> <mid> <treble>                 -> heed <n>                            what the picture leans toward
 // prism.js gives globalThis.prism, prism-ui.js gives globalThis.ui, engine.js gives HoloAudio, library.js gives
 // HoloLibrary, sources.js gives HoloSources. Scripts never import each other.
 const { invoke } = globalThis.prism;
@@ -62,6 +68,8 @@ let bands = kept('bands', null);
 let crossfeed = kept('crossfeed', null);
 let spatial = kept('spatial', false);
 let engine = null;
+let taps = null;   // two analysers at the end of the engine, left and right
+let visual = null; // the picture, once the Now Playing view has been opened
 let speed = kept('speed', 1);
 let positions = kept('positions', {}); // where each episode and chapter was left, in seconds
 let nowLine = '';                      // what a curated channel says it is playing
@@ -77,6 +85,12 @@ function ensureEngine() {
   if (Array.isArray(bands)) bands.forEach((gain, i) => engine.setBand(i, gain));
   if (crossfeed !== null) engine.setCrossfeed(crossfeed ? 0.6 : 0);
   engine.setSpatial(spatial);
+  // The picture is fed from the very end of the chain, after the limiter: the samples that reach the speakers,
+  // left and right apart.
+  const split = engine.ctx.createChannelSplitter(2);
+  engine.analyser.connect(split);
+  taps = [0, 1].map((channel) => { const node = engine.ctx.createAnalyser(); node.fftSize = 2048; node.smoothingTimeConstant = 0.55; split.connect(node, channel); return node; });
+  if (visual) visual.setTaps(taps[0], taps[1]);
   return true;
 }
 
@@ -199,6 +213,7 @@ async function attempt(mine) {
   if (routed === 'engine') engine.resume();
   session();
   remember(item);
+  faceOf(item);
   if (item.station) globalThis.HoloSources.radio.click(item.station);
   if (item.channel) channelLine();
   await resume(mine);
@@ -285,6 +300,8 @@ function drawTransport() {
   const paused = audio.paused;
   $('play-icon').hidden = !paused;
   $('pause-icon').hidden = paused;
+  $('now-play-icon').hidden = !paused;
+  $('now-pause-icon').hidden = paused;
   $('play').setAttribute('aria-label', paused ? 'Play' : 'Pause');
   $('repeat-word').textContent = repeat === 2 ? '1' : '';
   $('repeat').setAttribute('aria-label', `Repeat: ${REPEAT[repeat].toLowerCase()}`);
@@ -380,6 +397,7 @@ function draw() {
   if (verified === true) $('now-verified').setAttribute('data-tooltip', `These bytes re-derive to ${current.kappa}`);
   $('now-line').textContent = `${rep.label} · ${route}${verified === true ? ' · verified' : ''}`;
   drawCover($('now-cover'), current, 48);
+  drawNow();
   drawTransport();
 }
 
@@ -844,6 +862,119 @@ addEventListener('keydown', (event) => {
   else if (event.key === 's') $('shuffle').click();
   else if (event.key === 'r') $('repeat').click();
   else if (event.key === '/') { event.preventDefault(); $('search').focus(); }
+  else if (event.key === 'v') { if ($('now').hidden) openNow(); else closeNow(); }
+  else if (event.key === 'Escape' && !$('now').hidden) closeNow();
+});
+
+// ---- seeing the music. visuals.js draws; the model decides whether it may react, how hard, when the scene changes,
+// whether a flash is safe and how much detail the device can afford. This part asks, and passes the answers on.
+let showing = 'still';
+let detailStep = 2;
+let heeding = 0;
+let drawn = '';        // the picture's own size in pixels, as last measured
+let sceneSince = 0;
+let sceneLocked = false;
+let flashes = [];      // when each flash of the last second happened
+let watching = 0;
+let idle = 0;
+const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+async function faceOf(item) {
+  if (!visual) return;
+  let picture = '';
+  try { const found = await item.cover(600); picture = (Array.isArray(found) ? found[0] : found || '').replace(/^big:/, ''); } catch { picture = ''; }
+  visual.setTrack(item.id, picture);
+  sceneSince = performance.now();
+}
+
+function drawNow() {
+  if ($('now').hidden || !current) return;
+  const rep = playingRep();
+  $('now-big-title').textContent = current.title;
+  $('now-big-artist').textContent = nowLine || [current.artist, current.album].filter(Boolean).join(' · ');
+  const sound = current.reps.length ? `${rep.label} · ${routed === 'engine' ? `Engine · ${preset}` : 'Direct'}` : rep.label;
+  $('now-big-line').textContent = showing !== 'still' && drawn ? `${sound} · drawn at ${drawn}` : sound;
+  $('stage').hidden = showing === 'still';
+  $('now-still').hidden = showing !== 'still';
+  $('now-space').hidden = showing === 'still';
+  if (showing === 'still') drawCover($('now-art'), current, 320);
+}
+
+/** Once a second: may the picture react, how hard, and at what detail. */
+async function watch() {
+  if ($('now').hidden || !visual) return;
+  const seen = visual.stats();
+  const answer = await ask('shows', routed === 'engine' ? 1 : 0, seen.live ? 1 : 0, current && !audio.paused ? 1 : 0);
+  if (answer !== showing) { showing = answer; visual.setMode(showing); drawNow(); }
+  detailStep = numberOf(await ask('depth', detailStep, seen.millis));
+  visual.setStep(detailStep);
+  const size = `${seen.width} × ${seen.height}`;
+  if (size !== drawn) { drawn = size; drawNow(); }
+  if (showing !== 'react') return;
+  visual.setMood(numberOf(await ask('moods', seen.energy, seen.tempo)));
+  heeding = numberOf(await ask('heeds', heeding, seen.bass, seen.mid, seen.treble));
+  visual.setHeed(heeding);
+  await turn1(0);
+}
+
+/** Ask whether the scene changes now. A cut is also a flash, so it is put to the flash rule before it is made. */
+async function turn1(beat) {
+  const seen = visual.stats();
+  let answer = await ask('scene', (performance.now() - sceneSince) / 1000, beat, seen.boundary ? 1 : 0, sceneLocked ? 1 : calm() ? 2 : 0);
+  if (answer === 'stay') return;
+  if (answer === 'cut' && !(await mayFlash())) answer = 'blend';
+  visual.next(answer);
+  sceneSince = performance.now();
+}
+
+async function mayFlash() {
+  const now = performance.now();
+  flashes = flashes.filter((at1) => now - at1 < 1000);
+  if (await ask('flash', flashes.length, calm() ? 1 : 0) !== 'allow') return false;
+  flashes.push(performance.now());
+  return true;
+}
+
+function openNow() {
+  if (!current) return;
+  if (!visual && globalThis.HoloVisuals) {
+    visual = globalThis.HoloVisuals.create($('stage'));
+    if (visual) {
+      if (taps) visual.setTaps(taps[0], taps[1]);
+      visual.onbeat = async () => { if (showing !== 'react') return; if (await mayFlash()) visual.pulse(); turn1(1); };
+    }
+  }
+  $('now').hidden = false;
+  showing = 'still';
+  if (visual) { visual.setMode('still'); faceOf(current); visual.start(); }
+  drawNow();
+  watch();
+  watching = setInterval(watch, 1000);
+  stir();
+}
+function closeNow() {
+  $('now').hidden = true;
+  clearInterval(watching);
+  clearTimeout(idle);
+  if (visual) visual.stop();
+}
+// The words and buttons step back when the pointer rests, and return when it moves.
+function stir() {
+  for (const id of ['now-top', 'now-bottom']) $(id).classList.remove('opacity-0');
+  clearTimeout(idle);
+  idle = setTimeout(() => { if (showing === 'react') for (const id of ['now-top', 'now-bottom']) $(id).classList.add('opacity-0'); }, 3500);
+}
+$('now').addEventListener('pointermove', stir);
+$('now').addEventListener('pointerdown', stir);
+$('now-open').addEventListener('click', openNow);
+$('now-close').addEventListener('click', closeNow);
+$('now-prev').addEventListener('click', () => previous());
+$('now-next').addEventListener('click', () => next(false));
+$('now-play').addEventListener('click', () => $('play').click());
+$('now-lock').addEventListener('click', () => {
+  sceneLocked = !sceneLocked;
+  $('now-lock').setAttribute('aria-pressed', String(sceneLocked));
+  $('now-lock').setAttribute('data-state', sceneLocked ? 'on' : 'off');
 });
 
 buildSound();

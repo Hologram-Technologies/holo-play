@@ -89,6 +89,48 @@ statement = "A catalogue song plays from the companion when it is present, else 
 theorems = ["App.full_source_beats_preview", "App.preview_needs_a_preview", "App.companion_pick_needs_the_companion", "App.something_plays_when_anything_can"]
 
 [[id]]
+id = "VZ-01"
+level = "build"
+suite = "app"
+statement = "The picture reacts only while the item plays through the engine and its samples are arriving; an item the page cannot read is never drawn as sound"
+theorems = ["App.direct_is_never_drawn_as_sound", "App.react_needs_live_samples"]
+
+[[id]]
+id = "VZ-02"
+level = "build"
+suite = "app"
+statement = "A flash is allowed only while fewer than three happened in the last second, and never when calm is asked for"
+theorems = ["App.at_most_three_flashes_a_second", "App.calm_never_flashes"]
+
+[[id]]
+id = "VZ-03"
+level = "build"
+suite = "app"
+statement = "A scene is kept for at least eight seconds and left by forty-five, never changes while locked, cuts only on a beat, and never cuts when calm is asked for"
+theorems = ["App.scene_keeps_its_minimum", "App.scene_ends_by_its_maximum", "App.locked_scene_stays", "App.cut_lands_on_a_beat", "App.calm_never_cuts"]
+
+[[id]]
+id = "VZ-04"
+level = "build"
+suite = "app"
+statement = "The detail step stays between zero and five, never rises while frames are slow, and holds inside the band between fourteen and twenty-two milliseconds"
+theorems = ["App.detail_stays_in_range", "App.detail_never_rises_when_slow", "App.detail_holds_in_the_band"]
+
+[[id]]
+id = "VZ-05"
+level = "build"
+suite = "app"
+statement = "The mood is one of four steps, calm when the sound is quiet, and never calmer for more energy or a faster tempo"
+theorems = ["App.mood_stays_in_range", "App.quiet_is_calm", "App.more_energy_is_never_calmer", "App.faster_is_never_calmer"]
+
+[[id]]
+id = "VZ-06"
+level = "build"
+suite = "app"
+statement = "The picture leans toward one of bass, mid and treble, keeps it unless another is clearly stronger, and moves only to the strongest"
+theorems = ["App.attention_stays_in_range", "App.attention_holds_unless_clearly_beaten", "App.attention_moves_to_the_strongest"]
+
+[[id]]
 id = "HP-08"
 level = "build"
 suite = "app"
