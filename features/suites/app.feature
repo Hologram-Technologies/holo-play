@@ -100,6 +100,13 @@ Feature: app
     Then the statement holds for every request
     And prism-code build replays the request heeds 000000 000050 000060 000030, bass held with mid ten ahead, answered heed 000000
 
+  @VZ-07 @build
+  Scenario: A song played by a held player, which the page cannot read, may show a drifting picture only while it plays and animation is on; the picture drifts and is never drawn as reacting to the sound
+    Given the model in app/src/App.lex.tex
+    When prism-code check has Lean's kernel prove App.drift_only_for_a_held_song, App.drift_only_while_playing, App.drift_only_when_animation_is_on
+    Then the statement holds for every request
+    And prism-code build replays the request drift 000001 000001 000001, a held song playing with animation on, answered drift
+
   @PL-01 @build
   Scenario: A song plays from the companion, else an open full-length stream, else an embedded YouTube or SoundCloud player, else a preview; the player is chosen only when the holospace offers one, never over a stream the app can play itself, and always before a preview
     Given the model in app/src/App.lex.tex
@@ -120,6 +127,13 @@ Feature: app
     When prism-code check has Lean's kernel prove App.shown_player_is_large_enough, App.shown_player_is_inside_the_app
     Then the statement holds for every request
     And prism-code build replays the request place 000199 000200 000000 000000 000800 000600, a player 199 pixels wide, answered too small
+
+  @PL-04 @build
+  Scenario: A pasted YouTube or SoundCloud link plays in a held player only when the holospace holds that service's own player; no other link does
+    Given the model in app/src/App.lex.tex
+    When prism-code check has Lean's kernel prove App.youtube_link_needs_its_player, App.soundcloud_link_needs_its_player, App.only_those_links_are_held
+    Then the statement holds for every request
+    And prism-code build replays the request holds 000003 000001 000000, a YouTube link where its player is held, answered held
 
   @HP-08 @build @rejects
   Scenario: A request is accepted only at one of the five lengths a request has; any other request is answered invalid request

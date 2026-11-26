@@ -9,7 +9,7 @@ Status: Phase 3 of 3 (Polish and ship). Published at https://github.com/Hologram
 
 ## What is proved, what is tested, what is neither
 
-**Proved.** The model is `app/src/App.lex.tex`. Lean's kernel proves 51 theorems about it. The claims are registered
+**Proved.** The model is `app/src/App.lex.tex`. Lean's kernel proves 57 theorems about it. The claims are registered
 in `model/ids.toml` and listed in the generated `CONFORMANCE.md`.
 
 | ID | Claim |
@@ -29,11 +29,13 @@ in `model/ids.toml` and listed in the generated `CONFORMANCE.md`.
 | VZ-04 | The detail step stays between zero and five, never rises while frames are slow, and holds inside a band |
 | VZ-05 | The mood is calm when the sound is quiet and never calmer for more energy or a faster tempo |
 | VZ-06 | The picture leans toward one of bass, mid and treble, keeps it unless another is clearly stronger, and moves only to the strongest |
+| VZ-07 | A song played by a held player may show a drifting picture only while it plays and animation is on; it is never drawn as reacting to the sound |
 | PL-01 | A song plays from the companion, else an open full-length stream, else an embedded YouTube or SoundCloud player, else a preview; the player only when the holospace offers one |
 | PL-02 | A YouTube identifier is accepted only as eleven characters, each a letter, a digit, a hyphen or an underscore |
 | PL-03 | An embedded player is shown only at 200 by 200 pixels or more and wholly inside the app's own frame |
+| PL-04 | A pasted YouTube or SoundCloud link plays in a held player only when the holospace holds that service's own player |
 
-**Tested.** 113 acceptance vectors, replayed by `build` and `verify`. Playback in a browser, recorded in
+**Tested.** 124 acceptance vectors, replayed by `build` and `verify`. Playback in a browser, recorded in
 [docs/VERIFICATION-holo-play.md](docs/VERIFICATION-holo-play.md).
 
 **Neither.** The page (`app/view/`) is authored, not proved. Network sources, how a track sounds, and timings are
@@ -55,6 +57,8 @@ picks <companion> <open> <preview>                 -> companion | open | preview
 plays <companion> <open> <player> <preview>        -> companion | open | player | preview | none
 ytids <eleven characters>                          -> valid | not an identifier
 place <wide> <tall> <left> <top> <frameWide> <frameTall> -> show | too small | outside
+drift <held> <playing> <motion>                    -> drift | none
+holds <where> <youtube> <soundcloud>               -> held | none
 shows <engine> <samples> <playing>                 -> react | rest | still
 moods <energy> <tempo>                             -> mood <n>
 scene <seconds> <beat> <boundary> <hold>           -> stay | blend | cut

@@ -343,7 +343,10 @@ void main() {
       listen(now);
       settle(now);
       const reacting = mode === 'react';
-      clock += (passed / 1000) * (reacting ? pace() : 0.2); // the tempo sets the pace; at rest the picture slows and dims
+      // Drifting is for a song the page cannot read: the cover moves through the scene at one slow pace. Nothing in it
+      // comes from the sound, and no waveform is drawn.
+      const drifting = mode === 'drift';
+      clock += (passed / 1000) * (reacting ? pace() : drifting ? 0.45 : 0.2); // the tempo sets the pace; at rest the picture slows and dims
       const force = FORCE[mood];
       const [back, front] = frames;
       gl.viewport(0, 0, width, height);
@@ -356,10 +359,10 @@ void main() {
       gl.uniform1i(warp.names.last, 0);
       gl.uniform1f(warp.names.time, clock);
       gl.uniform1f(warp.names.zoom, scene.zoom);
-      gl.uniform1f(warp.names.turn, scene.turn * (reacting ? 1 : 0.3));
+      gl.uniform1f(warp.names.turn, scene.turn * (reacting || drifting ? 1 : 0.3));
       gl.uniform1f(warp.names.ripple, scene.ripple * force * (1 + 1.5 * attack) * lean(1));
       gl.uniform1f(warp.names.grain, scene.grain * (0.6 + 0.8 * bright) * (1 + 1.2 * noisy));
-      gl.uniform1f(warp.names.fade, reacting ? scene.fade : 0.94);
+      gl.uniform1f(warp.names.fade, reacting || drifting ? scene.fade : 0.94);
       gl.uniform1f(warp.names.bass, reacting ? (Math.min(2.5, level.bass) - 1) * force * lean(0) : 0);
       gl.uniform1f(warp.names.treble, reacting ? Math.min(2, level.treble) * lean(2) : 0);
       gl.uniform1f(warp.names.aspect, width / height);
@@ -383,6 +386,24 @@ void main() {
         trace();
         if (bloom > 0.01) { light(0.5, 0.5, 0.05 + 0.08 * bloom, ink(tone(), 0.22 * bloom)); bloom *= 0.86; }
         for (const [, spot] of touches) light(spot.x, spot.y, 0.03 + 0.03 * Math.min(2, level.bass), ink((tone() + 0.5) % 1, 0.12 + 0.2 * energy));
+      } else if (drifting) {
+        if (art && now >= artDue) {
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+          gl.useProgram(cover.made);
+          gl.bindTexture(gl.TEXTURE_2D, art);
+          gl.uniform1i(cover.names.art, 0);
+          gl.uniform1f(cover.names.aspect, width / height);
+          gl.uniform1f(cover.names.strength, 0.8);
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+          artDue = now + 7000; // laid in again as it dissolves
+        }
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE);
+        const t = now / 1000; // two slow lights on fixed paths, by the clock alone
+        light(0.5 + 0.34 * Math.sin(t * 0.21), 0.5 + 0.3 * Math.cos(t * 0.17), 0.09, ink(tone(), 0.11));
+        light(0.5 + 0.32 * Math.cos(t * 0.13 + 2), 0.5 + 0.32 * Math.sin(t * 0.19 + 1), 0.08, ink((tone() + 0.45) % 1, 0.09));
+        light(0.5 + 0.2 * Math.sin(t * 0.09 + 4), 0.5 + 0.22 * Math.cos(t * 0.11 + 3), 0.07, ink((tone() + 0.2) % 1, 0.07));
       }
       gl.disable(gl.BLEND);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -434,7 +455,7 @@ void main() {
         };
         image.src = picture;
       },
-      setMode(next1) { mode = next1; },
+      setMode(next1) { if (next1 === 'drift' && mode !== 'drift') artDue = 0; mode = next1; },
       setStep(n) { step = Math.max(0, Math.min(STEPS.length - 1, n)); },
       pulse() { bloom = 1; },
       next(kind) { next(kind, performance.now()); if (art) artDue = performance.now() + 400; },

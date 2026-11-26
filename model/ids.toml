@@ -131,6 +131,13 @@ statement = "The picture leans toward one of bass, mid and treble, keeps it unle
 theorems = ["App.attention_stays_in_range", "App.attention_holds_unless_clearly_beaten", "App.attention_moves_to_the_strongest"]
 
 [[id]]
+id = "VZ-07"
+level = "build"
+suite = "app"
+statement = "A song played by a held player, which the page cannot read, may show a drifting picture only while it plays and animation is on; the picture drifts and is never drawn as reacting to the sound"
+theorems = ["App.drift_only_for_a_held_song", "App.drift_only_while_playing", "App.drift_only_when_animation_is_on"]
+
+[[id]]
 id = "PL-01"
 level = "build"
 suite = "app"
@@ -154,6 +161,13 @@ statement = "An embedded player is shown only at 200 by 200 pixels or more and w
 theorems = ["App.shown_player_is_large_enough", "App.shown_player_is_inside_the_app"]
 failure = "too small"
 negative = "PL-03"
+
+[[id]]
+id = "PL-04"
+level = "build"
+suite = "app"
+statement = "A pasted YouTube or SoundCloud link plays in a held player only when the holospace holds that service's own player; no other link does"
+theorems = ["App.youtube_link_needs_its_player", "App.soundcloud_link_needs_its_player", "App.only_those_links_are_held"]
 
 [[id]]
 id = "HP-08"

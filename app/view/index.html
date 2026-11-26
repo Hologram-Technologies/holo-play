@@ -98,7 +98,11 @@
           </div>
 
           <div id="home" class="grid grid-cols-1 gap-10">
-            <div class="flex flex-wrap gap-2" id="moods" aria-label="Moods"></div>
+            <div class="flex flex-wrap items-center gap-2" aria-label="Moods and your tags">
+              <div class="contents" id="moods"></div>
+              <button data-slot="button" data-variant="outline" data-size="sm" class="rounded-full" type="button" id="tag-add" aria-label="Add your own tag" data-tooltip="Add your own"><span data-slot="icon" data-icon="plus" aria-hidden="true"></span></button>
+              <input data-slot="input" class="rounded-full w-xs" id="tag-name" type="text" maxlength="24" placeholder="A mood, a genre, an artist" aria-label="Your tag" autocomplete="off" spellcheck="false" hidden>
+            </div>
             <section aria-labelledby="chart-title" class="grid grid-cols-1 gap-4" id="chart-box">
               <h2 id="chart-title" class="font-display text-2xl font-semibold tracking-tight">Top songs</h2>
               <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="chart" aria-busy="true">
@@ -184,7 +188,7 @@
               <ol data-slot="item-group" class="gap-1 list-none" id="radio-list" aria-label="Stations"></ol>
             </section>
             <section aria-labelledby="soma-title" class="grid grid-cols-1 gap-4" id="soma-box">
-              <h2 id="soma-title" class="font-display text-2xl font-semibold tracking-tight">SomaFM channels</h2>
+              <h2 id="soma-title" class="font-display text-2xl font-semibold tracking-tight">Curated radio</h2>
               <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="soma" aria-busy="true">
                 <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
                 <div data-slot="skeleton" class="w-full aspect-square" aria-hidden="true"></div>
@@ -249,7 +253,7 @@
                 </div>
               </header>
             </div>
-            <div id="album-own" hidden><button data-slot="button" data-variant="outline" data-size="sm" type="button" id="album-delete"><span data-slot="icon" data-icon="trash-2" aria-hidden="true"></span>Delete playlist</button></div>
+            <div id="album-own" hidden><button data-slot="button" data-variant="outline" data-size="sm" type="button" id="album-delete"><span data-slot="icon" data-icon="trash-2" aria-hidden="true"></span><span id="album-delete-word">Delete playlist</span></button></div>
             <ol data-slot="item-group" class="gap-1 list-none" id="album-tracks" aria-label="Tracks"></ol>
             <section aria-labelledby="album-albums-title" class="grid grid-cols-1 gap-3" id="album-albums-box" hidden>
               <h3 class="font-display text-lg font-semibold tracking-tight" id="album-albums-title">Albums</h3>
@@ -261,7 +265,8 @@
       </div>
 
       <section class="fixed bottom-0 left-0 right-0 border-t bg-card/60 backdrop-blur px-6 py-3" id="player" aria-label="Player" hidden>
-        <div class="w-full max-w-6xl mx-auto flex items-center gap-4">
+        <canvas class="absolute inset-0 w-full h-full opacity-50" id="bar-stage" aria-hidden="true" hidden></canvas>
+        <div class="relative w-full max-w-6xl mx-auto flex items-center gap-4">
           <div class="grid grid-cols-2 gap-2 shrink-0" id="bar-slot" aria-hidden="true" hidden><div class="w-24 aspect-square"></div><div class="w-24 aspect-square"></div><div class="w-24 aspect-square"></div><div class="w-24 aspect-square"></div></div>
           <div class="grid gap-3 flex-1 min-w-0">
           <div class="grid min-w-0" id="bar-big" hidden>
@@ -279,6 +284,7 @@
               <span class="whitespace-nowrap" id="now-quality"></span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
+              <button data-slot="toggle" data-size="sm" type="button" aria-pressed="true" data-state="on" aria-label="Animation" data-tooltip="Animation" id="bar-motion"><span data-slot="icon" data-icon="eye" aria-hidden="true"></span></button>
               <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="See the music" data-tooltip="See the music (V)" id="now-open"><span data-slot="icon" data-icon="sparkles" aria-hidden="true"></span></button>
               <button data-slot="toggle" data-size="sm" type="button" aria-pressed="false" aria-label="Save" data-tooltip="Save" id="fav"><span data-slot="icon" data-icon="heart" aria-hidden="true"></span></button>
               <button data-slot="button" data-variant="ghost" data-size="icon" type="button" aria-label="Back 15 seconds" data-tooltip="Back 15 seconds" id="skip-back" hidden><span data-slot="icon" data-icon="rotate-ccw" aria-hidden="true"></span></button>
@@ -335,7 +341,7 @@
     </div>
   </section>
 
-  <div hidden aria-hidden="true"><span data-slot="icon" data-icon="target"></span><span data-slot="icon" data-icon="zap"></span><span data-slot="icon" data-icon="coffee"></span><span data-slot="icon" data-icon="moon"></span></div>
+  <div hidden aria-hidden="true"><span data-slot="icon" data-icon="hash"></span><span data-slot="icon" data-icon="target"></span><span data-slot="icon" data-icon="zap"></span><span data-slot="icon" data-icon="coffee"></span><span data-slot="icon" data-icon="moon"></span></div>
 
   <dialog data-slot="sheet" data-side="right" id="sound" aria-labelledby="sound-title">
     <div data-slot="dialog-header">
